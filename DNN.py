@@ -20,7 +20,6 @@ class DNN:
         self.learning_rate = float(config['learning_settings']['learning_rate'])
         self.discount_rate = float(config['learning_settings']['discount_rate'])
         self.goal_reward = float(config['learning_settings']['goal_reward'])
-        self.obstacle_reward = float(config['learning_settings']['obs_reward'])
         self.epsilon = 1.0  # = float(config['learning_settings']['epsilon'])
         self.gamma = 0.95
         self.epsilon_min = 0.01
