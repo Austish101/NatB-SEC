@@ -1,3 +1,7 @@
 {
-  "training_files": "/home/pi/Documents/DataSet/SECH.IncrementalDelayAndLoss_Eth1"
+  "training_files": "/home/pi/Documents/DataSet/SECH.IncrementalDelayAndLoss_Eth1",
+  "split": "70",
+  "learning_rate":  0.2,
+  "discount_rate": 0.2,
+  "epsilon": 1
 }
