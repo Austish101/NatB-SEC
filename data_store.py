@@ -22,4 +22,7 @@ def init():
     global ip_full_list
     global ip_ID
     ip_full_list = []
-    ip_ID = []    
+    ip_ID = []
+
+    global temp_array
+    temp_array = []
