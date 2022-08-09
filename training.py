@@ -8,13 +8,39 @@ import tensorflow as tf
 
 # get the expected output given input packets: the next error type and timestamp
 def outputs_given_inputs(input_data, output_data):
+    errstr_liveliness_changed = "DRIVER on_liveliness_changed"
+    errstr_requested_deadline_missed = "DRIVER on_requested_deadline_missed"
+    errstr_sample_lost = "DRIVER on_sample_lost"
+    dumpallerrors = True
+
     output = []
     n = 0
     for i in range(len(input_data)):
         if output_data[n][0] < input_data[i][0]:
             n = n + 1
-        # TODO change the append to the error type and timestamp of the error
-        output.append(output_data[n][1])
+
+            # error type
+            chrtemp = ""
+            strtemp = ""
+            for c in pkt.DATA.data_data.split(':'):
+                try:
+                    chrtemp = chr(int(c, 16))
+                    strtemp = strtemp + chrtemp
+                    # print(chr(int(c,16)), end='')
+                except ValueError:
+                    pass
+            if errstr_liveliness_changed in strtemp or errstr_requested_deadline_missed in strtemp or errstr_sample_lost in strtemp:
+                if dumpallerrors:
+                    print("At time: " + pkt.sniff_timestamp + " : ", end='')
+                    print(strtemp, end='')
+                if errstr_liveliness_changed in strtemp:
+                    error_type = [output_data[n][0], 1, 0, 0]
+                elif errstr_requested_deadline_missed in strtemp:
+                    error_type = [output_data[n][0], 0, 1, 0]
+                elif errstr_sample_lost in strtemp:
+                    error_type = [output_data[n][0], 0, 0, 1]
+
+        output.append(error_type)
     return output
 
 
