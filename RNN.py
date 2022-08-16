@@ -5,7 +5,7 @@ import random
 import csv
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, SimpleRNN
+from keras.layers import Dense, Dropout, SimpleRNN, Input
 from keras.optimizers import Adam
 
 
@@ -31,7 +31,10 @@ class RNN:
 
     def create_model(self):
         model = Sequential()
-        model.add(Dense(24, input_dim=len(self.input_data[0]+2), activation="relu"))  # +2 as the last output will be added
+        #model.add()(Dense(24, input_dim=len(self.input_data[0]+2), activation="relu"))  # +2 as the last output will be added
+        x1 = Input(shape=(len(self.input_data[0])+2,))
+        model.add(x1)
+        model.add(Dense(24, activation="relu"))
         model.add(Dense(48, activation="relu"))
         model.add(Dense(24, activation="relu"))
         model.add(Dense(len(self.output_data[0]), activation="softmax"))

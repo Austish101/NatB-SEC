@@ -16,13 +16,12 @@ def outputs_given_inputs(input_data, output_data):
     output = []
     n = 0
     for i in range(len(input_data)):
+        error_type = [0, 0, 0, 0]
         if output_data[n][0] < input_data[i][0]:
-            n = n + 1
-
             # error type
             chrtemp = ""
             strtemp = ""
-            for c in pkt.DATA.data_data.split(':'):
+            for c in output_data[n][1].data_data.split(':'):
                 try:
                     chrtemp = chr(int(c, 16))
                     strtemp = strtemp + chrtemp
@@ -31,7 +30,7 @@ def outputs_given_inputs(input_data, output_data):
                     pass
             if errstr_liveliness_changed in strtemp or errstr_requested_deadline_missed in strtemp or errstr_sample_lost in strtemp:
                 if dumpallerrors:
-                    print("At time: " + pkt.sniff_timestamp + " : ", end='')
+                    print("t: " + str(output_data[n][0]) + " n: " + str(n) + " i: " + str(i) + " : ", end='')
                     print(strtemp, end='')
                 if errstr_liveliness_changed in strtemp:
                     error_type = [output_data[n][0], 1, 0, 0]
@@ -40,6 +39,14 @@ def outputs_given_inputs(input_data, output_data):
                 elif errstr_sample_lost in strtemp:
                     error_type = [output_data[n][0], 0, 0, 1]
 
+            else:
+                #print("## Warning : No Error identified where an error should have been detected.")
+                #print("## t: " + output_data[n][0] + " n: " + str(n) + " i: " + str(i) + " : ", end='')
+
+                error_type = [output_data[n][0], 0, 0, 0]
+            if n < (len(output_data)-1):
+                n = n + 1
+
         output.append(error_type)
     return output
 
@@ -47,7 +54,7 @@ def outputs_given_inputs(input_data, output_data):
 # split a set of data into two, given a percentage
 def split_data(split_percentage, data):
     data_len = len(data)
-    split_point = round(data_len * (split_percentage / 100))
+    split_point = round(data_len * (int(split_percentage) / 100))
     split1 = data[:split_point]
     split2 = data[split_point:]
     return split1, split2

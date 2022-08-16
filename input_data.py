@@ -12,19 +12,23 @@ def get_inputs_and_outputs(filename):
     rtps_capture = pyshark.FileCapture(filename + ".RTPS.pcap")
     input_list = []
     _list = []
+    print("Loading Input Files")
     for pkt in rtps_capture:
         # extract pertinent data e.g. actual payload, from packet into input_list
         # TODO include other non-rtps packets, but must be in the same format as the rtps packets
         if pkt.highest_layer == "RTPS":
-            input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
+            input_list.append([float(pkt.sniff_timestamp)])#, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
+            #commenting off a lot of the content to get this to run - most of this is STRING values.
+            #will ammend this to individual values later.
 
     lbl_capture = pyshark.FileCapture(filename + ".LABEL.pcap")
     output_list = []
     for pkt in lbl_capture:
         # extract pertinent data e.g. error data, from packet into output_list
         if pkt.highest_layer == "DATA":
-            output_list.append([pkt.sniff_timestamp, pkt.DATA])
+            output_list.append([float(pkt.sniff_timestamp), pkt.DATA])
 
+    print("Finished Loading Input Files")
     return input_list, output_list
 
 
