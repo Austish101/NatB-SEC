@@ -5,8 +5,8 @@ import json
 
 
 # get inputs from rtps file, get expected output from label file
-# TODO data MUST be flat (only a 1d list, not nested), can't do 'pkt.rtps' or 'pkt.DATA' as below
-# TODO data should be normalised, not sure how yet, preferably between 0-1 for all inputs and outputs,
+# done using extend? - data MUST be flat (only a 1d list, not nested), can't do 'pkt.rtps' or 'pkt.DATA' as below
+# done but standardisation instead - data should be normalised, not sure how yet, preferably between 0-1 for all inputs and outputs,
 #       TODO ^^ above also has to work when reading off the wire
 def get_inputs_and_outputs(filename):
     rtps_capture = pyshark.FileCapture(filename + ".RTPS.pcap")
@@ -16,7 +16,9 @@ def get_inputs_and_outputs(filename):
         # extract pertinent data e.g. actual payload, from packet into input_list
         # TODO include other non-rtps packets, but must be in the same format as the rtps packets
         if pkt.highest_layer == "RTPS":
-            input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
+            # input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
+            input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host])
+            input_list[-1].extend(pkt.rtps)
 
     lbl_capture = pyshark.FileCapture(filename + ".LABEL.pcap")
     output_list = []

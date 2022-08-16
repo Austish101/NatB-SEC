@@ -29,6 +29,7 @@ class RNN:
         self.model = self.create_model()
         self.target_model = self.create_model()
 
+
     def create_model(self):
         model = Sequential()
         model.add(Dense(24, input_dim=len(self.input_data[0]+2), activation="relu"))  # +2 as the last output will be added
@@ -80,6 +81,7 @@ class RNN:
         self.target_train()
 
     # todo funcations for saving and loading the neural net weights, makes the model portable!
+    # TODO also make sure standard deviation and mean of dataset are saved, sd/mean
     def save_data(self, filename):
         with open(filename, mode='w') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
