@@ -2,32 +2,47 @@
 # https://github.com/KimiNewt/pyshark/
 import pyshark
 import json
+import numpy as np
+
+
+def get_rtps_data(rtps, selection):
+    selected_data = []
+    if selection[0] != "all":
+        for attr in selection:
+            attr_val = rtps.get_field_value(attr)
+            if attr_val == None:
+                selected_data.append(float(2))
+            else:
+                selected_data.append(float(attr_val))
+    return selected_data
 
 
 # get inputs from rtps file, get expected output from label file
 # done using extend? - data MUST be flat (only a 1d list, not nested), can't do 'pkt.rtps' or 'pkt.DATA' as below
 # done but standardisation instead - data should be normalised, not sure how yet, preferably between 0-1 for all inputs and outputs,
 #       TODO ^^ above also has to work when reading off the wire
-def get_inputs_and_outputs(filename):
+def get_inputs_and_outputs(filename, rtps_selection):
     rtps_capture = pyshark.FileCapture(filename + ".RTPS.pcap")
     input_list = []
-    _list = []
     for pkt in rtps_capture:
         # extract pertinent data e.g. actual payload, from packet into input_list
         # TODO include other non-rtps packets, but must be in the same format as the rtps packets
         if pkt.highest_layer == "RTPS":
             # input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
-            input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host])
-            input_list[-1].extend(pkt.rtps)
+            # TODO ips should probably include 2 and 3 to cover multicast etc
+            src_ip = pkt.ip.src_host.split(".")
+            dst_ip = pkt.ip.dst_host.split(".")
+            input_list.append([float(pkt.sniff_timestamp), float(src_ip[3]), float(dst_ip[3])])
+            input_list[-1].extend(get_rtps_data(pkt.rtps, rtps_selection))
 
     lbl_capture = pyshark.FileCapture(filename + ".LABEL.pcap")
     output_list = []
     for pkt in lbl_capture:
         # extract pertinent data e.g. error data, from packet into output_list
         if pkt.highest_layer == "DATA":
-            output_list.append([pkt.sniff_timestamp, pkt.DATA])
+            output_list.append([float(pkt.sniff_timestamp), pkt.DATA.data_data])
 
-    return input_list, output_list
+    return np.array(input_list), np.array(output_list)
 
 
 def read_json(filename):

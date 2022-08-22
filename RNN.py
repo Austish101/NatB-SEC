@@ -72,9 +72,11 @@ class RNN:
             return 0  # todo random output data using tf.random.uniform probably
         return np.argmax(self.model.predict(inputs))
 
-    def update(self, inputs, expected_outputs, actual_outputs):
+    def update(self, inputs, expected_outputs, actual_outputs, show=False):
         # todo calculate reward based on expected vs actual output, this is a BAD example
         reward = abs(expected_outputs[0] - actual_outputs[0])
+        if show:
+            print(reward)
 
         self.remember(inputs, actual_outputs, reward)
         self.replay()
