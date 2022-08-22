@@ -74,7 +74,15 @@ class RNN:
 
     def update(self, inputs, expected_outputs, actual_outputs):
         # todo calculate reward based on expected vs actual output, this is a BAD example
-        reward = abs(expected_outputs[0] - actual_outputs[0])
+         if expected_outputs[0] > actual_outputs[0]:
+            reward = actual_outputs[0]/expected_outputs[0]
+            return
+        if expected_outputs[0] < actual_outputs[0]:
+            reward = expected_outputs[0] / actual_outputs[0]
+            return
+        if expected_outputs[0] == actual_outputs[0]:
+            reward = 1
+            return
 
         self.remember(inputs, actual_outputs, reward)
         self.replay()
