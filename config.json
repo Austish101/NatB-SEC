@@ -1,8 +1,12 @@
 {
-  "training_files": "DataSet/SECH.IncrementalDelayAndLoss_Eth1",
+  "training_files": ["SECH.IncrementalDelay_Eth1Eth2", "SECH.IncrementalDelayAndLoss_Eth1", "SECH.IncrementalDelayEth1", "SECH.IncrementalDelayEth2", "SECH.IncrementalLoss_Eth1", "SECH.IncrementalLoss_Eth1Eth2", "SECH.IncrementalLoss_Eth2"],
+  "training_filepath": "Dataset/",
   "split": "70",
+  "rtps_selection": ["flag_endianness", "flag_final", "flag_liveliness", "flag_reserved", "heartbeat_count", "sm_acknack_analysis"],
   "learning_rate":  0.2,
   "discount_rate": 0.2,
   "epsilon": 1,
-  "rtps_selection": ["flag_endianness", "flag_final", "flag_liveliness", "flag_reserved", "heartbeat_count", "sm_acknack_analysis"]
+  "episodes": 1000,
+  "loss": "mean_squared_error",
+  "activation": "tanh"
 }

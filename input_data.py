@@ -21,8 +21,8 @@ def get_rtps_data(rtps, selection):
 # done using extend? - data MUST be flat (only a 1d list, not nested), can't do 'pkt.rtps' or 'pkt.DATA' as below
 # done but standardisation instead - data should be normalised, not sure how yet, preferably between 0-1 for all inputs and outputs,
 #       TODO ^^ above also has to work when reading off the wire
-def get_inputs_and_outputs(filename, rtps_selection):
-    rtps_capture = pyshark.FileCapture(filename + ".RTPS.pcap")
+def get_inputs_and_outputs(filepath, filename, rtps_selection):
+    rtps_capture = pyshark.FileCapture(filepath + filename + ".RTPS.pcap")
     input_list = []
     for pkt in rtps_capture:
         # extract pertinent data e.g. actual payload, from packet into input_list
@@ -34,13 +34,15 @@ def get_inputs_and_outputs(filename, rtps_selection):
             dst_ip = pkt.ip.dst_host.split(".")
             input_list.append([float(pkt.sniff_timestamp), float(src_ip[3]), float(dst_ip[3])])
             input_list[-1].extend(get_rtps_data(pkt.rtps, rtps_selection))
+    rtps_capture.close()
 
-    lbl_capture = pyshark.FileCapture(filename + ".LABEL.pcap")
+    lbl_capture = pyshark.FileCapture(filepath + filename + ".LABEL.pcap")
     output_list = []
     for pkt in lbl_capture:
         # extract pertinent data e.g. error data, from packet into output_list
         if pkt.highest_layer == "DATA":
             output_list.append([float(pkt.sniff_timestamp), pkt.DATA.data_data])
+    lbl_capture.close()
 
     return np.array(input_list), np.array(output_list)
 

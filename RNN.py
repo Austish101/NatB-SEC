@@ -16,6 +16,8 @@ class RNN:
         self.learning_rate = float(config['learning_rate'])
         self.discount_rate = float(config['discount_rate'])
         self.epsilon = float(config['epsilon'])
+        self.loss = config['loss']
+        self.activation = config['activation']
         self.gamma = 0.95
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
@@ -29,14 +31,13 @@ class RNN:
         self.model = self.create_model()
         self.target_model = self.create_model()
 
-
     def create_model(self):
         model = Sequential()
-        model.add(Dense(24, input_dim=len(self.input_data[0]+2), activation="relu"))  # +2 as the last output will be added
+        model.add(Dense(24, input_dim=(self.input_data[0].shape[0]+4), activation="relu"))  # +2 as the last output will be added
         model.add(Dense(48, activation="relu"))
         model.add(Dense(24, activation="relu"))
-        model.add(Dense(len(self.output_data[0]), activation="softmax"))
-        model.compile(loss="mean_squared_error", optimizer=Adam(lr=self.learning_rate))
+        model.add(Dense(self.output_data[0].shape[0], activation=self.activation))
+        model.compile(loss=self.loss, optimizer=Adam(learning_rate=self.learning_rate))
         return model
 
     def remember(self, inputs, outputs, reward):
@@ -50,7 +51,7 @@ class RNN:
         samples = random.sample(self.memory, batch_size)
         for sample in samples:
             inputs, outputs, reward = sample
-            target = self.target_model.predict(inputs)
+            target = np.argmax(self.target_model.predict(inputs))
             # future = max(self.target_model.predict(next_inputs)[0])
             target[0][outputs] = reward * self.gamma
             self.model.fit(inputs, target, epoch=1, verbose=0)
@@ -69,8 +70,11 @@ class RNN:
 
         rand = random.uniform(0, 1)
         if rand <= self.epsilon:
-            return 0  # todo random output data using tf.random.uniform probably
+            return [random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1)]
         return np.argmax(self.model.predict(inputs))
+
+    def fit(self, inputs, outputs, epochs=1000):
+        self.model.fit(inputs, outputs, epochs=epochs)
 
     def update(self, inputs, expected_outputs, actual_outputs, show=False):
         # todo calculate reward based on expected vs actual output, this is a BAD example
