@@ -120,3 +120,5 @@ for pkt in inputs:
 # TODO second loop for testing data
 
 # TODO save the weights and the sd/means
+
+net.model.save_weights("./netweight.dat")
