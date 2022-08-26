@@ -33,7 +33,7 @@ class RNN:
 
     def create_model(self):
         model = Sequential()
-        model.add(Dense(24, input_dim=(self.input_data[0].shape[0]+4), activation="relu"))  # +2 as the last output will be added
+        model.add(Dense(24, input_dim=(self.input_data[0].shape[0]+self.output_data[0].shape[0]), activation="relu"))  # + as the last output will be added
         model.add(Dense(48, activation="relu"))
         model.add(Dense(24, activation="relu"))
         model.add(Dense(self.output_data[0].shape[0], activation=self.activation))

@@ -3,6 +3,7 @@
 # file data must be fed into the DNN at a variable speed, it will be slower than real time to start with
 import input_data
 import RNN
+import LSTM
 import tensorflow as tf
 import numpy as np
 
@@ -119,21 +120,32 @@ def inverse_standard(data, sd, mean):
 # TODO read more or all training files at once, to get all errors and possible outcomes
 config = input_data.read_json("config.json")
 
-training_in_list = []
-training_out_list = []
-testing_in_list = []
-testing_out_list = []
-for file in config["training_files"]:
-    file_input_data, file_output_data = input_data.get_inputs_and_outputs(config["training_filepath"], file, config["rtps_selection"])
-    training_in, training_out, testing_in, testing_out = outputs_given_inputs(file_input_data, file_output_data, int(config["split"]))
-    training_in_list.extend(training_in)
-    training_out_list.extend(training_out)
-    testing_in_list.extend(testing_in)
-    testing_out_list.extend(testing_out)
-training_in_all = np.array(training_in_list)
-training_out_all = np.array(training_out_list)
-testing_in_all = np.array(testing_in_list)
-testing_out_all = np.array(testing_out_list)
+try:
+    training_in_all = np.loadtxt('training_in.txt', dtype=float)
+    training_out_all = np.loadtxt('training_out.txt', dtype=float)
+    testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
+    testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
+except FileNotFoundError:
+    training_in_list = []
+    training_out_list = []
+    testing_in_list = []
+    testing_out_list = []
+    for file in config["training_files"]:
+        file_input_data, file_output_data = input_data.get_inputs_and_outputs(config["training_filepath"], file, config["rtps_selection"])
+        training_in, training_out, testing_in, testing_out = outputs_given_inputs(file_input_data, file_output_data, int(config["split"]))
+        training_in_list.extend(training_in)
+        training_out_list.extend(training_out)
+        testing_in_list.extend(testing_in)
+        testing_out_list.extend(testing_out)
+    training_in_all = np.array(training_in_list)
+    training_out_all = np.array(training_out_list)
+    testing_in_all = np.array(testing_in_list)
+    testing_out_all = np.array(testing_out_list)
+
+    np.savetxt('training_in.txt', training_in_all, fmt='%f')
+    np.savetxt('training_out.txt', training_out_all, fmt='%f')
+    np.savetxt('testing_in.txt', testing_in_all, fmt='%f')
+    np.savetxt('testing_out.txt', testing_out_all, fmt='%f')
 
 
 input_sd, input_mean = get_sd_mean(training_in_all)
@@ -143,54 +155,60 @@ training_out_std = standard_data(training_out_all, output_sd, output_mean)
 testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
 testing_out_std = standard_data(testing_out_all, output_sd, output_mean)
 
-# currently using nonstandardised output data
-net = RNN.RNN(config, training_in_std, training_out_all)
+# using non-std output data?
+net = LSTM.SplitLSTM(config, training_in_std, training_out_all)
+net.fit_models(epochs=10)
+score = net.predict(testing_in_std, testing_out_all)
+print(score)
 
-# net.fit(training_in_std, training_out_all)
-
-# training loop
-tf.random.set_seed(5)
-random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
-random_timestamp = tf.random.uniform(shape=[], minval=training_in_all[0][0], maxval=training_in_all[training_in_all.shape[0]-1][0])  # random timestamp
-if random_error == 0:
-    previous_output = standard_data(np.array([random_timestamp, 1, 0, 0]), output_sd, output_mean)
-elif random_error == 1:
-    previous_output = standard_data(np.array([random_timestamp, 0, 1, 0]), output_sd, output_mean)
-else:
-    previous_output = standard_data(np.array([random_timestamp, 0, 0, 1]), output_sd, output_mean)
-
-for episodes in range(0, int(config['episodes'])):
-    i = 0
-    for pkt in training_in_std:
-        inputs = np.append(pkt, previous_output)
-        # pkt.append(previous_output)
-        actual_output = net.produce_output(inputs)
-        net.update(inputs, training_out_std[i], actual_output, show=True)
-        previous_output = actual_output
-        i = i + 1
-
-
-# testing loop
-tf.random.set_seed(5)
-random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
-random_timestamp = tf.random.uniform(shape=[], minval=input_data[0][0], maxval=input_data[len(input_data)-1][0])  # random timestamp
-previous_output = np.array([0.0, 0.0, 0.0, 0.0])
+# for RNN:
+# # net = RNN.RNN(config, training_in_std, training_out_std)
+#
+# # net.fit(training_in_std, training_out_all)
+#
+# # training loop
+# tf.random.set_seed(5)
+# random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
+# random_timestamp = tf.random.uniform(shape=[], minval=training_in_all[0][0], maxval=training_in_all[training_in_all.shape[0]-1][0])  # random timestamp
 # if random_error == 0:
-#     previous_output = np.array(standard_data([random_timestamp, 1, 0, 0], output_sd, output_mean))
+#     previous_output = standard_data(np.array([random_timestamp, 1, 0, 0]), output_sd, output_mean)
 # elif random_error == 1:
-#     previous_output = np.array(standard_data([random_timestamp, 0, 1, 0], output_sd, output_mean))
+#     previous_output = standard_data(np.array([random_timestamp, 0, 1, 0]), output_sd, output_mean)
 # else:
-#     previous_output = np.array(standard_data([random_timestamp, 0, 0, 1], output_sd, output_mean))
-
-i = 0
-for pkt in testing_in_std:
-    pkt.append(previous_output)
-    actual_output = net.produce_output(pkt)
-    previous_output = actual_output
-    i = i + 1
-    # TODO better accuracy stat than below, should be closely linked to reward calculation
-    actual_inv = inverse_standard(actual_output, output_sd, output_mean)
-    expected_inv = testing_out[i]
-    print(abs(actual_inv[0]-expected_inv[0]))
+#     previous_output = standard_data(np.array([random_timestamp, 0, 0, 1]), output_sd, output_mean)
+#
+# for episodes in range(0, int(config['episodes'])):
+#     i = 0
+#     for pkt in training_in_std:
+#         inputs = np.append(pkt, previous_output)
+#         # pkt.append(previous_output)
+#         actual_output = net.produce_output(inputs)
+#         net.update(inputs, training_out_std[i], actual_output, show=True)
+#         previous_output = actual_output
+#         i = i + 1
+#
+#
+# # testing loop
+# tf.random.set_seed(5)
+# random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
+# random_timestamp = tf.random.uniform(shape=[], minval=file_input_data[0][0], maxval=file_input_data[file_input_data.shape[0]-1][0])  # random timestamp
+# previous_output = np.array([0.0, 0.0, 0.0, 0.0])
+# # if random_error == 0:
+# #     previous_output = np.array(standard_data([random_timestamp, 1, 0, 0], output_sd, output_mean))
+# # elif random_error == 1:
+# #     previous_output = np.array(standard_data([random_timestamp, 0, 1, 0], output_sd, output_mean))
+# # else:
+# #     previous_output = np.array(standard_data([random_timestamp, 0, 0, 1], output_sd, output_mean))
+#
+# i = 0
+# for pkt in testing_in_std:
+#     pkt.append(previous_output)
+#     actual_output = net.produce_output(pkt)
+#     previous_output = actual_output
+#     i = i + 1
+#     # TODO better accuracy stat than below, should be closely linked to reward calculation
+#     actual_inv = inverse_standard(actual_output, output_sd, output_mean)
+#     expected_inv = testing_out[i]
+#     print(abs(actual_inv[0]-expected_inv[0]))
 
 # TODO save the weights and the sd/means
