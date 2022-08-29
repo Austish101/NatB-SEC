@@ -90,7 +90,7 @@ def get_sd_mean(data):
     return sd, mean
 
 
-def standard_data(data, sd, mean):
+def standard_data(data, sd, mean, kind="all"):
     std_data = data
 
     if data.shape.__len__() == 1:
@@ -100,21 +100,15 @@ def standard_data(data, sd, mean):
         return std_data
 
     for p in range(0, data.shape[0]):
-        for d in range(0, data[0].shape[0]):
-            calc = (data[p][d] - mean[d]) / sd[d]
-            std_data[p][d] = float(calc)
+        if kind == "non-error":
+            calc = (data[p][0] - mean[0]) / sd[0]
+            std_data[p][0] = float(calc)
+        else:
+            for d in range(0, data[0].shape[0]):
+                calc = (data[p][d] - mean[d]) / sd[d]
+                std_data[p][d] = float(calc)
 
     return std_data
-
-
-def inverse_standard(data, sd, mean):
-    real_data = data
-
-    for p in range(0, data.len()):
-        for d in range(0, data[0].len()):
-            real_data[p][d] = (data[p][d] * sd[d]) + mean[d]
-
-    return real_data
 
 
 # TODO read more or all training files at once, to get all errors and possible outcomes
@@ -151,15 +145,19 @@ except FileNotFoundError:
 input_sd, input_mean = get_sd_mean(training_in_all)
 output_sd, output_mean = get_sd_mean(training_out_all)
 training_in_std = standard_data(training_in_all, input_sd, input_mean)
-training_out_std = standard_data(training_out_all, output_sd, output_mean)
+training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
 testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
-testing_out_std = standard_data(testing_out_all, output_sd, output_mean)
+testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
 # using non-std output data?
-net = LSTM.SplitLSTM(config, training_in_std, training_out_all)
-net.fit_models(epochs=10)
-score = net.predict(testing_in_std, testing_out_all)
-print(score)
+scores = []
+net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+for i in range(0, 100):
+    net.fit_models(epochs=10)
+    time_score, error_score = net.predict(testing_in_std, testing_out_std)
+    scores.append([time_score, error_score])
+    print("Time Score:", time_score, "\nError Score:", error_score)
+np.savetxt('scores_over_100_by_10_trains.txt', np.array(scores))
 
 # for RNN:
 # # net = RNN.RNN(config, training_in_std, training_out_std)

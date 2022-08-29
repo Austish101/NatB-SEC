@@ -3,7 +3,7 @@
   "training_filepath": "Dataset/",
   "split": "70",
   "rtps_selection": ["flag_endianness", "flag_final", "flag_liveliness", "flag_reserved", "heartbeat_count", "sm_acknack_analysis"],
-  "learning_rate":  0.2,
+  "learning_rate":  0.1,
   "discount_rate": 0.2,
   "epsilon": 1,
   "episodes": 1000,
