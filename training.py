@@ -119,7 +119,9 @@ try:
     training_out_all = np.loadtxt('training_out.txt', dtype=float)
     testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
     testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
+    print("Data loaded from saved files")
 except FileNotFoundError:
+    print("Loading data from pcap files and saving for faster reading next time")
     training_in_list = []
     training_out_list = []
     testing_in_list = []
@@ -152,12 +154,15 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 # using non-std output data?
 scores = []
 net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
-for i in range(0, 100):
+for i in range(0, 20):
     net.fit_models(epochs=10)
     time_score, error_score = net.predict(testing_in_std, testing_out_std)
     scores.append([time_score, error_score])
     print("Time Score:", time_score, "\nError Score:", error_score)
 np.savetxt('scores_over_100_by_10_trains.txt', np.array(scores))
+
+# save the weights and the sd/means
+net.save_weights_sd_mean(np.array([input_sd, input_mean, output_sd, output_mean]))
 
 # for RNN:
 # # net = RNN.RNN(config, training_in_std, training_out_std)
@@ -209,4 +214,4 @@ np.savetxt('scores_over_100_by_10_trains.txt', np.array(scores))
 #     expected_inv = testing_out[i]
 #     print(abs(actual_inv[0]-expected_inv[0]))
 
-# TODO save the weights and the sd/means
+

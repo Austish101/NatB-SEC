@@ -1,3 +1,4 @@
+import keras.models
 from keras.models import Sequential
 from keras.layers import Dense, LSTM
 from keras.optimizers import Adam
@@ -83,3 +84,12 @@ class SplitLSTM:
         average = float(total / prediction.shape[0])
 
         return average
+
+    def save_weights_sd_mean(self, sd_means):
+        self.error_model.save("error_model")
+        self.time_model.save("time_model")
+        np.savetxt('sd_means.txt', sd_means)
+
+    def load_models(self, error_file, time_file):
+        self.error_model = keras.models.load_model("error_model")
+        self.time_model = keras.models.load_model("time_model")
