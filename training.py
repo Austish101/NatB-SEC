@@ -6,6 +6,7 @@ import RNN
 import LSTM
 import tensorflow as tf
 import numpy as np
+import os
 
 
 # get the expected output given input packets: the next error type and timestamp
@@ -114,12 +115,17 @@ def standard_data(data, sd, mean, kind="all"):
 # TODO read more or all training files at once, to get all errors and possible outcomes
 config = input_data.read_json("config.json")
 
+#if (os.path.exists('training_in.txt') and
+#    os.path.exists('training_out.txt') and
+#    os.path.exists('testing_in.txt') and
+#    os.path.exists('testing_out.txt')):
 try:
     training_in_all = np.loadtxt('training_in.txt', dtype=float)
     training_out_all = np.loadtxt('training_out.txt', dtype=float)
     testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
     testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
-except FileNotFoundError:
+#except:
+except: #FileNotFoundError:
     training_in_list = []
     training_out_list = []
     testing_in_list = []
