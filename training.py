@@ -210,3 +210,5 @@ np.savetxt('scores_over_100_by_10_trains.txt', np.array(scores))
 #     print(abs(actual_inv[0]-expected_inv[0]))
 
 # TODO save the weights and the sd/means
+
+net.model.save_weights("./netweight.dat")
