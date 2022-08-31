@@ -85,10 +85,13 @@ class SplitLSTM:
 
         return average
 
-    def save_weights_sd_mean(self, sd_means):
+    def save_weights_sd_mean(self, input_sd, input_mean, output_sd, output_mean):
+        input_sd_mean = np.array([input_sd, input_mean])
+        output_sd_mean = np.array([output_sd, output_mean])
         self.error_model.save("error_model")
         self.time_model.save("time_model")
-        np.savetxt('sd_means.txt', sd_means)
+        np.savetxt('input_sd_mean.txt', input_sd_mean, fmt='%f')
+        np.savetxt('output_sd_mean.txt', output_sd_mean, fmt='%f')
 
     def load_models(self, error_file, time_file):
         self.error_model = keras.models.load_model("error_model")
