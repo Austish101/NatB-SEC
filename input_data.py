@@ -61,3 +61,4 @@ def get_input_line(pkt, rtps_selection):
     input_line = []
     input_line.append([float(pkt.sniff_timestamp), float(src_ip[3]), float(dst_ip[3])])
     input_line[-1].extend(get_rtps_data(pkt.rtps, rtps_selection))
+    return input_line
