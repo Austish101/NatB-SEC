@@ -11,5 +11,6 @@
   "activation": "tanh",
   "team": 0,
   "networkname": "Wi-Fi 2",
-  "timeout": 20
+  "timeout": 20,
+  "training_repeats": 100
 }

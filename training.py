@@ -6,7 +6,7 @@ import RNN
 import LSTM
 import tensorflow as tf
 import numpy as np
-import os
+#import os
 
 
 # get the expected output given input packets: the next error type and timestamp
@@ -158,7 +158,7 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 # using non-std output data?
 scores = []
 net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
-for i in range(0, 100):
+for i in range(0, config["training_repeats"]):
     net.fit_models(epochs=10)
     time_score, error_score = net.predict(testing_in_std, testing_out_std)
     scores.append([time_score, error_score])
@@ -217,4 +217,5 @@ np.savetxt('scores_over_100_by_10_trains.txt', np.array(scores))
 
 # TODO save the weights and the sd/means
 
-net.model.save_weights("./netweight.dat")
+net.error_model.save_weights("./error_weights.dat")
+net.time_model.save_weights("./time_weights.dat")
