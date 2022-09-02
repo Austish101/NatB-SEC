@@ -57,13 +57,23 @@ class SplitLSTM:
 
         combined_score = error_score * time_score
 
-        return time_score, error_score
+        return time_score, error_score, combined_score
 
     def evaluate_time(self, prediction, expected):
         scores = []
         total = 0
         for i in range(0, prediction.shape[0]):
             score = abs(prediction[i] - expected[i])
+            if expected[i] > prediction[i]:
+                score = prediction[i] / expected[i]
+                return
+            elif expected[i] < prediction[i]:
+                score = expected[i] / prediction[i]
+                return
+            elif expected[i] == prediction[i]:
+                score = 1
+                return
+
             scores.append(score)
             total = total + score
         average = float(total / prediction.shape[0])

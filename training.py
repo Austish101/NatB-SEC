@@ -156,10 +156,10 @@ scores = []
 net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
 for i in range(0, 1):
     net.fit_models(epochs=10)
-    time_score, error_score = net.predict(testing_in_std, testing_out_std)
+    time_score, error_score, combined_score = net.predict(testing_in_std, testing_out_std)
     scores.append([time_score, error_score])
-    print("Time Score:", time_score, "\nError Score:", error_score)
-np.savetxt('scores_over_10_by_10_trains.txt', np.array(scores))
+    print("Time Score:", time_score, "\nError Score:", error_score, "\nCombined:", combined_score)
+np.savetxt('scores_over_1_by_10_trains.txt', np.array(scores))
 
 # save the weights and the sd/means
 net.save_weights_sd_mean(input_sd, input_mean, output_sd, output_mean)
