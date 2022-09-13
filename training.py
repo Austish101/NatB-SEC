@@ -7,6 +7,9 @@ import LSTM
 import tensorflow as tf
 import numpy as np
 
+#This is required if CUDA drivers are installed, LSTM performs badly on CUDA over CPU
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # get the expected output given input packets: the next error type and timestamp
 def outputs_given_inputs(input_data, output_data, split):
@@ -120,7 +123,7 @@ try:
     testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
     testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
     print("Training data loaded from saved files")
-except FileNotFoundError:
+except: #FileNotFoundError: (doesn't work on all OS, now just any exception...)
     print("Loading training data from pcap files and saving for faster reading next time, this may take some time")
     training_in_list = []
     training_out_list = []
@@ -154,7 +157,7 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 # using non-std output data?
 scores = []
 net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
-for i in range(0, 1):
+for i in range(0, config["training_repeats"]):
     net.fit_models(epochs=10)
     time_score, error_score, combined_score = net.predict(testing_in_std, testing_out_std)
     scores.append([time_score, error_score])

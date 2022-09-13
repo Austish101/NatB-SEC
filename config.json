@@ -8,5 +8,9 @@
   "epsilon": 1,
   "episodes": 1000,
   "loss": "mean_squared_error",
-  "activation": "tanh"
+  "activation": "tanh",
+  "team": 0,
+  "networkname": "Wi-Fi 2",
+  "timeout": 20,
+  "training_repeats": 1
 }

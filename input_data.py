@@ -30,10 +30,8 @@ def get_inputs_and_outputs(filepath, filename, rtps_selection):
         if pkt.highest_layer == "RTPS":
             # input_list.append([pkt.sniff_timestamp, pkt.ip.src_host, pkt.ip.dst_host, pkt.rtps])
             # TODO ips should probably include 2 and 3 to cover multicast etc
-            src_ip = pkt.ip.src_host.split(".")
-            dst_ip = pkt.ip.dst_host.split(".")
-            input_list.append([float(pkt.sniff_timestamp), float(src_ip[3]), float(dst_ip[3])])
-            input_list[-1].extend(get_rtps_data(pkt.rtps, rtps_selection))
+            input_line = get_input_line(pkt, rtps_selection)
+            input_list = input_list + input_line
     rtps_capture.close()
 
     lbl_capture = pyshark.FileCapture(filepath + filename + ".LABEL.pcap")
@@ -56,7 +54,14 @@ def read_json(filename):
         print("ERROR: Can't read file, ensure it exists")
         quit()
 
+def get_input_line(pkt, rtps_selection):
+    src_ip = pkt.ip.src_host.split(".")
+    dst_ip = pkt.ip.dst_host.split(".")
+    input_line = []
+    input_line.append([float(pkt.sniff_timestamp), float(src_ip[3]), float(dst_ip[3])])
+    input_line[-1].extend(get_rtps_data(pkt.rtps, rtps_selection))
+    return input_line
 
 # TODO use pyshark to read packets from interface (likely eno1), format the same as the file version
-def read_from_wire(interface):
-    return interface
+#def read_from_wire(interface):
+    #return interface

@@ -2,3 +2,7 @@
 *.pcap
 *.ascii
 *.pcap1
+testing_in.txt
+testing_out.txt
+training_in.txt
+training_out.txt
