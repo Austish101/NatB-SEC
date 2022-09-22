@@ -1,3 +1,8 @@
+# To Do
+#
+# - Add Syncronising Routine (as wont be the same time on hosts as this client)
+# - May need additional pipe to return sync offset from thread routine, likely bidirectional
+# - Add check for current time in the time thread
 
 import RNN
 import tensorflow as tf
@@ -7,6 +12,9 @@ import input_data #only need this one to get a small file to setup the array siz
 import LSTM
 import json
 firstpkt = True #this is to get around pyshark being super buggy on first call
+from multiprocessing import Process, Pipe
+from multiprocessing import Pool
+import multiprocessing
 
 config = input_data.read_json("config.json")
 #create a file that has basically nothing but two or three samples, so it loads quickly to initialise the arrays.
@@ -17,6 +25,16 @@ ifname = config["networkname"] #Wi-Fi 2 just what I'm testing with....
 time_out = config["timeout"] #set this far higher, or basically infinitely high to run forever...
 
 pktarray = np.zeros((3, 9), dtype='float') #edit this to be dynamic, get 3+length of params list from config
+pipe_recv, pipe_send = Pipe()
+
+#a time offset for syncronising and a check for if it has been initialised yet or not.
+#use the first packet to do this...
+syncoffset = 0
+syncinit = False
+
+testvar = False
+
+
 
 #copied from training.py
 def standard_data(data, sd, mean, kind="all"):
@@ -50,30 +68,43 @@ def shiftpktarray(self, pktarray_in, pkt):
     newpktarray[0] = pkt
     return newpktarray
 
-#need to load an input and output array to configure the network.
-try:
-    training_in_all = np.loadtxt('training_in.txt', dtype=float)
-    training_out_all = np.loadtxt('training_out.txt', dtype=float)
-    testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
-    testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
-except:
-    print("A training file is required to initialise the neural network.")
-    sys.exit()
+#def checktimes_thread():
+def threads(threadno, pipe):
+    if threadno == 0:
+        print("Thread 0 Start")
+        runthread = True
+        while runthread:
+            #just a check to see if threads can read other threads,
+            if pipe.poll():
+                temp = pipe.recv()
+                if temp != "end":
+                    print("Packet Detected: ", temp)
+                else:
+                    print("Killing Time Monitor")
+                    runthread = False
+            #global testvar
+            #if testvar == True:
+            #    testvar = False
+            #    print("Packet Detected")
+    else:
+        print("Thread 1 Start")
+        #def checknetwork_thread():
+        capture = pyshark.LiveCapture(interface=ifname)
+        for pkt in capture.sniff_continuously():
+            pkt_callback(pkt, pipe)
+        #try:
+        #    capture.apply_on_packets(pkt_callback, timeout=time_out)
+        #except:
+        #    print("Capture Time Completed or error, restart program if more required.")
+        pipe.send("end")
 
-input_sd, input_mean = get_sd_mean(training_in_all)
-output_sd, output_mean = get_sd_mean(training_out_all)
-training_in_std = standard_data(training_in_all, input_sd, input_mean)
-training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
-testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
-testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
-#scores = []
-net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
-net.load_models("", "") #the params aren't currently used...
-
-#net = RNN.RNN(config, inputs_temp, outputs_temp)
-
-def pkt_callback(pkt):
+#Note that pktarray may have problems - will need to pass this through all defs down to this level.
+def pkt_callback(pkt, pipe_send):
+    #global testvar
+    #testvar = True
+    #global pipe_send
+    pipe_send.send(pkt.sniff_timestamp)
     if pkt.highest_layer == "RTPS":
         input_line = input_data.get_input_line(pkt, config["rtps_selection"])
         global pktarray
@@ -101,12 +132,51 @@ def pkt_callback(pkt):
               predict_error[0][3] +
               predict_time[0])
 
-capture = pyshark.LiveCapture(interface=ifname)
+if __name__ == '__main__':
+    # need to load an input and output array to configure the network.
+    try:
+        training_in_all = np.loadtxt('training_in.txt', dtype=float)
+        training_out_all = np.loadtxt('training_out.txt', dtype=float)
+        testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
+        testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
+    except:
+        print("A training file is required to initialise the neural network.")
+        sys.exit()
 
-try:
-    capture.apply_on_packets(pkt_callback, timeout=time_out)
-except:
-    print("Capture Time Completed or error, restart program if more required.")
+    input_sd, input_mean = get_sd_mean(training_in_all)
+    output_sd, output_mean = get_sd_mean(training_out_all)
+    training_in_std = standard_data(training_in_all, input_sd, input_mean)
+    training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
+    testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
+    testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
+
+    # scores = []
+    net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+    net.load_models("", "")  # the params aren't currently used...
+
+    # net = RNN.RNN(config, inputs_temp, outputs_temp)
+
+    print("Capture Started")
+    print("number of CPU detected: ", multiprocessing.cpu_count())
+    with Pool(2) as p:
+        p.starmap(threads, [(0, pipe_recv), (1, pipe_send)])
+        #= Process(target=threads, args=(i,))
+        #jobs.append(p)
+        #p.start()
+    #with Pool(processes=2) as pool:
+    #    pool.apply_async(func=threads, args=[0, 1])
+    #    while True:
+    #        pass
+    #x = Process(target=checknetwork_thread(), args=(0,), daemon=True)
+    #y = Process(target=checktimes_thread(), args=(0,), daemon=True)
+    #y.start()
+    #x.start()
+    #x.join()
+    #y.join()
+    #while x.is_alive():
+    #    pass
+    #y.close()
+
 
 
 
