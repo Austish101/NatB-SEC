@@ -15,6 +15,7 @@ firstpkt = True #this is to get around pyshark being super buggy on first call
 from multiprocessing import Process, Pipe
 from multiprocessing import Pool
 import multiprocessing
+import time
 
 config = input_data.read_json("config.json")
 #create a file that has basically nothing but two or three samples, so it loads quickly to initialise the arrays.
@@ -26,11 +27,12 @@ time_out = config["timeout"] #set this far higher, or basically infinitely high 
 
 pktarray = np.zeros((3, 9), dtype='float') #edit this to be dynamic, get 3+length of params list from config
 pipe_recv, pipe_send = Pipe()
+syncpipe_recv, syncpipe_send = Pipe()
 
 #a time offset for syncronising and a check for if it has been initialised yet or not.
 #use the first packet to do this...
-syncoffset = 0
-syncinit = False
+#syncoffset = 0
+#syncinit = False
 
 testvar = False
 
@@ -63,48 +65,78 @@ def get_sd_mean(data):
     mean = np.mean(data, axis=0, dtype=float)
     return sd, mean
 
-def shiftpktarray(self, pktarray_in, pkt):
+def shiftpktarray(pktarray_in, pkt):
     newpktarray = np.roll(pktarray_in, 1, axis=0)
     newpktarray[0] = pkt
     return newpktarray
 
 #def checktimes_thread():
-def threads(threadno, pipe):
+def threads(net, threadno, pipe, syncpipe):
     if threadno == 0:
         print("Thread 0 Start")
         runthread = True
+        syncinit = False
+        syncoffset = 0
         while runthread:
-            #just a check to see if threads can read other threads,
+            # Sync is because we can't be certain the network is time synced to the PI
+            # This therefore resolves that issue.
+            if not syncinit:
+                if syncpipe.poll():
+                    syncoffset = syncpipe.recv()
+                    syncinit = True
             if pipe.poll():
-                temp = pipe.recv()
-                if temp != "end":
-                    print("Packet Detected: ", temp)
-                else:
-                    print("Killing Time Monitor")
-                    runthread = False
+                pipearray = pipe.recv()
+                #print("Packet Detected")
+                if pipearray[0] + syncoffset > time.time():
+                    if pipearray[1] > pipearray[2] and pipearray[1] > pipearray[3]:
+                        pass
+                        #/on_liveliness_changed
+                        #NEST API SEND RESULT
+                    elif pipearray[2] > pipearray[1] and pipearray[2] > pipearray[3]:
+                        pass
+                        #/on_requested_deadline_missed
+                        #NEST API SEND RESULT
+                    else:
+                        pass
+                        #/on_sample_lost
+                        #NEST API SEND RESULT
+
+            #    if temp != "end":
+            #    else:
+            #        print("Killing Time Monitor")
+            #        runthread = False
             #global testvar
             #if testvar == True:
             #    testvar = False
             #    print("Packet Detected")
     else:
         print("Thread 1 Start")
+        syncoffset = float(0)
+        syncinit = False
+        _, output_sd_mean = net.get_sd_mean()
+        time_sd = output_sd_mean[0][0]
+        time_mean = output_sd_mean[1][0]
+        error_sd = output_sd_mean[0][1:]
+        error_mean = output_sd_mean[1][1:]
         #def checknetwork_thread():
         capture = pyshark.LiveCapture(interface=ifname)
         for pkt in capture.sniff_continuously():
-            pkt_callback(pkt, pipe)
+            syncinit, syncoffset = pkt_callback(pkt, pipe, syncpipe, syncinit, syncoffset, time_sd, time_mean)
         #try:
         #    capture.apply_on_packets(pkt_callback, timeout=time_out)
         #except:
         #    print("Capture Time Completed or error, restart program if more required.")
         pipe.send("end")
 
-
 #Note that pktarray may have problems - will need to pass this through all defs down to this level.
-def pkt_callback(pkt, pipe_send):
+def pkt_callback(net, pkt, pipe_send, syncpipe_send, syncinit, syncoffset, time_sd, time_mean):
     #global testvar
     #testvar = True
     #global pipe_send
-    pipe_send.send(pkt.sniff_timestamp)
+    if syncinit == False:
+        syncoffset = float(pkt.sniff_timestamp) - time.time()
+        syncpipe_send(syncoffset)
+    #pipe_send.send(pkt.sniff_timestamp)
     if pkt.highest_layer == "RTPS":
         input_line = input_data.get_input_line(pkt, config["rtps_selection"])
         global pktarray
@@ -112,10 +144,14 @@ def pkt_callback(pkt, pipe_send):
         #if firstpkt == True:
         #    firstpkt = False
         #    return
-        pktarray = (pktarray, input_line)
+        pktarray = shiftpktarray(pktarray, input_line)
         #predict_d = net.model.predict(input_line, verbose=0) #if this fails put "input_line" into [ ] brackets.
         predict_error = net.error_model.predict(pktarray)
         predict_time = net.time_model.predict(pktarray)
+        predict_time = (predict_time * time_sd) + time_mean #reverse the standardisation
+        pipearray = np.concatenate((predict_time, predict_error))
+        pipe_send.send(pipearray)
+
         # believe we need to have an output category for "everything is fine" from some prior testing
         # if thats the case then check against predict_d[0][0] (the OK category) for detection?
         #if predict_d[0][n] > threshold or predict_d[0][0]:
@@ -131,6 +167,7 @@ def pkt_callback(pkt, pipe_send):
               predict_error[0][2] + ", " +
               predict_error[0][3] +
               predict_time[0])
+    return syncinit, syncoffset
 
 if __name__ == '__main__':
     # need to load an input and output array to configure the network.
@@ -153,13 +190,12 @@ if __name__ == '__main__':
     # scores = []
     net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
     net.load_models("", "")  # the params aren't currently used...
-
     # net = RNN.RNN(config, inputs_temp, outputs_temp)
 
     print("Capture Started")
     print("number of CPU detected: ", multiprocessing.cpu_count())
     with Pool(2) as p:
-        p.starmap(threads, [(0, pipe_recv), (1, pipe_send)])
+        p.starmap(threads, [(0, 0, pipe_recv, syncpipe_recv), (net, 1, pipe_send, syncpipe_send)])
         #= Process(target=threads, args=(i,))
         #jobs.append(p)
         #p.start()

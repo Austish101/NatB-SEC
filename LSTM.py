@@ -66,13 +66,13 @@ class SplitLSTM:
             score = abs(prediction[i] - expected[i])
             if expected[i] > prediction[i]:
                 score = prediction[i] / expected[i]
-                return
+            #    return
             elif expected[i] < prediction[i]:
                 score = expected[i] / prediction[i]
-                return
+            #    return
             elif expected[i] == prediction[i]:
                 score = 1
-                return
+            #    return
 
             scores.append(score)
             total = total + score
@@ -106,3 +106,8 @@ class SplitLSTM:
     def load_models(self, error_file, time_file):
         self.error_model = keras.models.load_model("error_model")
         self.time_model = keras.models.load_model("time_model")
+
+    def get_sd_mean(self):
+        input_sd_mean = np.loadtxt('input_sd_mean.txt')
+        output_sd_mean = np.loadtxt('input_sd_mean.txt')
+        return input_sd_mean, output_sd_mean
