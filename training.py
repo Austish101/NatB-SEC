@@ -153,16 +153,43 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 
 # using non-std output data?
 scores = []
-net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+net = LSTM.SplitLSTM(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
 for i in range(0, 1):
-    net.fit_models(epochs=10)
-    time_score, error_score, combined_score = net.predict(testing_in_std, testing_out_std)
-    scores.append([time_score, error_score])
-    print("Time Score:", time_score, "\nError Score:", error_score, "\nCombined:", combined_score)
-np.savetxt('scores_over_1_by_10_trains.txt', np.array(scores))
+    net.fit_models(epochs=1)
+    input_shaped, output_shaped = net.shape_data(training_in_std, training_out_std)
+    error_threshold = float(config['error_threshold'])
+    time_threshold = float(config['time_threshold'])
+    # time_score, error_score, combined_score = net.predict_test(input_shaped, output_shaped, "score", error_threshold, time_threshold)
+    # scores.append([time_score, error_score])
+    # print("Time Score:", time_score, "\nError Score:", error_score, "\nCombined:", combined_score)
+    for input_set in input_shaped:
+        predictions, stats = net.predict_test(input_shaped, output_shaped, "stats", error_threshold, time_threshold)
+        error_correct, time_correct, time_difference = np.split(stats, [1, 2], axis=1)
+        num_predictions = error_correct.shape[0]
+        num_correct = 0
+        num_time_only = 0
+        num_error_only = 0
+        tot_time_dif = 0
+        for n in range(0, num_predictions):
+            if error_correct[n] and time_correct[n]:
+                num_correct = num_correct + 1
+            elif error_correct[n]:
+                num_error_only = num_error_only + 1
+            elif time_correct[n]:
+                num_time_only = num_time_only + 1
+            tot_time_dif = tot_time_dif + time_difference[n]
+
+        avg_time_dif = tot_time_dif / num_predictions
+        per_correct = (num_correct / num_predictions) * 100
+        per_time_only = (num_time_only / num_predictions) * 100
+        per_error_only = (num_error_only / num_predictions) * 100
+
+        run_data = [[per_correct, per_time_only, per_error_only, avg_time_dif], config]
+
+np.savetxt('stats_over_100_by_1_trains.txt', np.array(run_data))
 
 # save the weights and the sd/means
-net.save_weights_sd_mean(input_sd, input_mean, output_sd, output_mean)
+net.save_model_sd_mean("100x1", input_sd, input_mean, output_sd, output_mean)
 
 # for RNN:
 # # net = RNN.RNN(config, training_in_std, training_out_std)
