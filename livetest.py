@@ -11,6 +11,9 @@ import pyshark
 import input_data #only need this one to get a small file to setup the array sizes - might be able to get rid of later
 import LSTM
 import json
+
+import output_data
+
 firstpkt = True #this is to get around pyshark being super buggy on first call
 from multiprocessing import Process, Pipe
 from multiprocessing import Pool
@@ -22,6 +25,8 @@ config = input_data.read_json("config.json")
 #alternatively, generate a blank array of the right lengths.
 #inputs_temp, outputs_temp = input_data.get_inputs_and_outputs(config["training_files"])
 team = config["team"]
+port = config["port"]
+api_url = config["api_url"]
 ifname = config["networkname"] #Wi-Fi 2 just what I'm testing with....
 time_out = config["timeout"] #set this far higher, or basically infinitely high to run forever...
 
@@ -70,13 +75,21 @@ def shiftpktarray(pktarray_in, pkt):
     newpktarray[0] = pkt
     return newpktarray
 
-#def checktimes_thread():
+#=================================================================================================================
+# The time management thread and the packet detection thread
+#=================================================================================================================
+
 def threads(net, threadno, pipe, syncpipe):
     if threadno == 0:
         print("Thread 0 Start")
         runthread = True
         syncinit = False
         syncoffset = 0
+        sent_already_if_true = False #enforces pulses for errors to occur only ONCE.
+        alive_count = 0
+        not_alive_count = 0
+        missed_total_count = 0
+        lost_reason = "DDS_LOST_BY_WRITER"
         while runthread:
             # Sync is because we can't be certain the network is time synced to the PI
             # This therefore resolves that issue.
@@ -87,19 +100,28 @@ def threads(net, threadno, pipe, syncpipe):
             if pipe.poll():
                 pipearray = pipe.recv()
                 #print("Packet Detected")
-                if pipearray[0] + syncoffset > time.time():
-                    if pipearray[1] > pipearray[2] and pipearray[1] > pipearray[3]:
-                        pass
-                        #/on_liveliness_changed
-                        #NEST API SEND RESULT
-                    elif pipearray[2] > pipearray[1] and pipearray[2] > pipearray[3]:
-                        pass
-                        #/on_requested_deadline_missed
-                        #NEST API SEND RESULT
-                    else:
-                        pass
-                        #/on_sample_lost
-                        #NEST API SEND RESULT
+                #==================================================
+                # SEND TO REST API IF ERROR PREDICTED
+                #==================================================
+                if (pipearray[0] + syncoffset < time.time()): #is the predicted time less than actual time? then error has happened.
+                    if sent_already_if_true == False: #ensures only one message per error prediction
+                        sent_already_if_true = True
+                        if pipearray[1] > pipearray[2] and pipearray[1] > pipearray[3]:
+                            #insert any change for alive_count or not_alive count here if desired
+                            #seems to generally be once and 1 or 0, suggest don't bother.
+                            output_data.REST_on_liveliness_changed(
+                                port, api_url, team, alive_count, not_alive_count)
+                        elif pipearray[2] > pipearray[1] and pipearray[2] > pipearray[3]:
+                            missed_total_count = missed_total_count + 1
+                            output_data.REST_on_requested_deadline_missed(
+                                port, api_url, team, missed_total_count)
+                        else:
+                            #insert any change for lost_reason here if desired
+                            #all examples in provided data is DDS_LOST_BY_WRITER which I've set as default, suggest don't bother.
+                            output_data.REST_on_sample_lost(
+                                port, api_url, team, lost_reason)
+                else:
+                    sent_already_if_true = False
 
             #    if temp != "end":
             #    else:
@@ -151,22 +173,6 @@ def pkt_callback(net, pkt, pipe_send, syncpipe_send, syncinit, syncoffset, time_
         predict_time = (predict_time * time_sd) + time_mean #reverse the standardisation
         pipearray = np.concatenate((predict_time, predict_error))
         pipe_send.send(pipearray)
-
-        # believe we need to have an output category for "everything is fine" from some prior testing
-        # if thats the case then check against predict_d[0][0] (the OK category) for detection?
-        #if predict_d[0][n] > threshold or predict_d[0][0]:
-        #   nestAPI.on_liveliness_changed(team, alive_count, not_alive_count)
-        # if predict_d[0][n] > threshold or predict_d[0][0]:
-        #   nestAPI.on_samplelost(team, lost_reason)
-        # if predict_d[0][n] > threshold or predict_d[0][0]:
-        #   nestAPI.on_liveliness_changed(team, missed_total_count)
-        # print any diagnostics here... e.g:
-        print("T: " + pkt.sniff_timestamp + " P: " +
-              predict_error[0][0] + ", " +
-              predict_error[0][1] + ", " +
-              predict_error[0][2] + ", " +
-              predict_error[0][3] +
-              predict_time[0])
     return syncinit, syncoffset
 
 if __name__ == '__main__':
