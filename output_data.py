@@ -1,14 +1,32 @@
 import requests
+import json
 
+#api_url = config['api_url']
+#port = config['port']
 
-def api_post(url, port, error_type, team, alive_count, not_alive_count, lost_reason, missed_total_count, tag):
-    post_data = {"team": team,
-                 "error_type": error_type,
-                 "alive_count": alive_count,
-                 "not_alive_count": not_alive_count,
-                 "lost_reason": lost_reason,
-                 "missed_total_count": missed_total_count}
+#need to customise each of these, just not done it yet need caracal access.
+#useful info on requests : https://requests.readthedocs.io/en/latest/user/quickstart/#passing-parameters-in-urls
 
-    post_url = "%s:%s" % (url, port)
+def REST_on_liveliness_changed(port, api_url,
+             team, alive_count, not_alive_count):
+    myData = {"team": team,
+              "alive_count": alive_count,
+              "not_alive_count": not_alive_count,}
+    requests.post(api_url + '/on_liveliness_changed', json=myData)
 
-    requests.post(post_url, json=post_data)
+def REST_on_requested_deadline_missed(port, api_url,
+             team, missed_total_count):
+    myData = {"team": team,
+              "missed_total_count": missed_total_count}
+    requests.post(api_url + '/on_requested_deadline_missed', json=myData)
+
+def REST_on_sample_lost(port, api_url,
+             team, lost_reason):
+    myData = {"team": team,
+              "lost_reason": lost_reason}
+    requests.post(api_url + '/on_sample_lost', json=myData)
+
+def REST_generic(port, api_url, team, tag):
+    myData = {"team": team,
+              "tag": tag}
+    requests.post(api_url + '/generic', json=myData)

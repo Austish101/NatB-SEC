@@ -3,6 +3,7 @@
 # file data must be fed into the DNN at a variable speed, it will be slower than real time to start with
 import input_data
 import RNN
+import LSTM
 import tensorflow as tf
 import numpy as np
 #required for clustering (if it works)
@@ -11,6 +12,9 @@ import tempfile
 import zipfile
 import os
 
+#This is required if CUDA drivers are installed, LSTM performs badly on CUDA over CPU
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # get the expected output given input packets: the next error type and timestamp
 def outputs_given_inputs(input_data, output_data, split):
@@ -124,7 +128,7 @@ try:
     testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
     testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
     print("Training data loaded from saved files")
-except FileNotFoundError:
+except: #FileNotFoundError: (doesn't work on all OS, now just any exception...)
     print("Loading training data from pcap files and saving for faster reading next time, this may take some time")
     training_in_list = []
     training_out_list = []
@@ -157,8 +161,9 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 
 # using non-std output data?
 scores = []
-net = RNN.Split(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
-for i in range(0, 1):
+net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+for i in range(0, int(config["training_repeats"])):
+    np.savetxt('scores_over_%s_by_10_trains.txt'%int(config["training_repeats"])), np.array(scores))
     net.fit_models(epochs=100)
     input_shaped, output_shaped = net.shape_data(training_in_std, training_out_std, int(config['window_size']))
     error_threshold = float(config['error_threshold'])
@@ -193,7 +198,7 @@ for i in range(0, 1):
 # np.savetxt('stats_over_100_by_1_trains.txt', np.array(run_data))
 
 # save the weights and the sd/means
-net.save_model_sd_mean("100x1", input_sd, input_mean, output_sd, output_mean)
+net.save_model_sd_mean("100x%s"%int(config["training_repeats"]), input_sd, input_mean, output_sd, output_mean)
 
 # im going to try SOME CLUSTERING BABYYYYYYYYYYYYYYYYYYYYYYYYYYYYY - Jack Roberto 2k22
 # will need to run command
