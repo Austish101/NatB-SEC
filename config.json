@@ -17,7 +17,7 @@
   "tau": 0.05,
   "window_size": 25,
   "error_threshold": 0.9,
-  "time_threshold": 200
+  "time_threshold": 200,
   "team": 0,
   "networkname": "Wi-Fi 2",
   "timeout": 20,

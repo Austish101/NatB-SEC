@@ -3,7 +3,6 @@
 # file data must be fed into the DNN at a variable speed, it will be slower than real time to start with
 import input_data
 import RNN
-import LSTM
 import tensorflow as tf
 import numpy as np
 #required for clustering (if it works)
@@ -161,9 +160,8 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 
 # using non-std output data?
 scores = []
-net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+net = RNN.Split(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
 for i in range(0, int(config["training_repeats"])):
-    np.savetxt('scores_over_%s_by_10_trains.txt'%int(config["training_repeats"])), np.array(scores))
     net.fit_models(epochs=100)
     input_shaped, output_shaped = net.shape_data(training_in_std, training_out_std, int(config['window_size']))
     error_threshold = float(config['error_threshold'])
@@ -198,7 +196,7 @@ for i in range(0, int(config["training_repeats"])):
 # np.savetxt('stats_over_100_by_1_trains.txt', np.array(run_data))
 
 # save the weights and the sd/means
-net.save_model_sd_mean("100x%s"%int(config["training_repeats"]), input_sd, input_mean, output_sd, output_mean)
+net.save_model_sd_mean("100x%s" % int(config["training_repeats"]), input_sd, input_mean, output_sd, output_mean)
 
 # im going to try SOME CLUSTERING BABYYYYYYYYYYYYYYYYYYYYYYYYYYYYY - Jack Roberto 2k22
 # will need to run command
@@ -212,7 +210,7 @@ clustering_params={
     'number_of_clusters': 10,  #too many clusters increases accuracy - slows down system (think nodes)
     'cluster_centroids_init': centroidInitialization.LINEAR
     }
-clustered_model = cluster_weights(model, **clustering_params) #TODO i THINK "model" needs to be replaced with model name
+clustered_model = cluster_weights(net, **clustering_params)  # TODO i THINK "model" needs to be replaced with model name
 opt = tf.keras.optimizer.Adam(learning_rate=1e-5)
 clustered_model.compile(
     loss=tf.keras.losses.sparseCategoricalCrossentropy(from_logits=True),
