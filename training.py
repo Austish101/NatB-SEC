@@ -3,9 +3,13 @@
 # file data must be fed into the DNN at a variable speed, it will be slower than real time to start with
 import input_data
 import RNN
-import LSTM
 import tensorflow as tf
 import numpy as np
+#required for clustering (if it works)
+import tensorflow_model_optimization as tfmot
+import tempfile
+import zipfile
+import os
 
 
 # get the expected output given input packets: the next error type and timestamp
@@ -153,7 +157,7 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 
 # using non-std output data?
 scores = []
-net = LSTM.SplitLSTM(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
+net = RNN.Split(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
 for i in range(0, 1):
     net.fit_models(epochs=100)
     input_shaped, output_shaped = net.shape_data(training_in_std, training_out_std, int(config['window_size']))
@@ -191,54 +195,39 @@ for i in range(0, 1):
 # save the weights and the sd/means
 net.save_model_sd_mean("100x1", input_sd, input_mean, output_sd, output_mean)
 
-# for RNN:
-# # net = RNN.RNN(config, training_in_std, training_out_std)
-#
-# # net.fit(training_in_std, training_out_all)
-#
-# # training loop
-# tf.random.set_seed(5)
-# random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
-# random_timestamp = tf.random.uniform(shape=[], minval=training_in_all[0][0], maxval=training_in_all[training_in_all.shape[0]-1][0])  # random timestamp
-# if random_error == 0:
-#     previous_output = standard_data(np.array([random_timestamp, 1, 0, 0]), output_sd, output_mean)
-# elif random_error == 1:
-#     previous_output = standard_data(np.array([random_timestamp, 0, 1, 0]), output_sd, output_mean)
-# else:
-#     previous_output = standard_data(np.array([random_timestamp, 0, 0, 1]), output_sd, output_mean)
-#
-# for episodes in range(0, int(config['episodes'])):
-#     i = 0
-#     for pkt in training_in_std:
-#         inputs = np.append(pkt, previous_output)
-#         # pkt.append(previous_output)
-#         actual_output = net.produce_output(inputs)
-#         net.update(inputs, training_out_std[i], actual_output, show=True)
-#         previous_output = actual_output
-#         i = i + 1
-#
-#
-# # testing loop
-# tf.random.set_seed(5)
-# random_error = tf.random.uniform(shape=[], minval=0, maxval=2)  # random error type
-# random_timestamp = tf.random.uniform(shape=[], minval=file_input_data[0][0], maxval=file_input_data[file_input_data.shape[0]-1][0])  # random timestamp
-# previous_output = np.array([0.0, 0.0, 0.0, 0.0])
-# # if random_error == 0:
-# #     previous_output = np.array(standard_data([random_timestamp, 1, 0, 0], output_sd, output_mean))
-# # elif random_error == 1:
-# #     previous_output = np.array(standard_data([random_timestamp, 0, 1, 0], output_sd, output_mean))
-# # else:
-# #     previous_output = np.array(standard_data([random_timestamp, 0, 0, 1], output_sd, output_mean))
-#
-# i = 0
-# for pkt in testing_in_std:
-#     pkt.append(previous_output)
-#     actual_output = net.produce_output(pkt)
-#     previous_output = actual_output
-#     i = i + 1
-#     # TODO better accuracy stat than below, should be closely linked to reward calculation
-#     actual_inv = inverse_standard(actual_output, output_sd, output_mean)
-#     expected_inv = testing_out[i]
-#     print(abs(actual_inv[0]-expected_inv[0]))
+# im going to try SOME CLUSTERING BABYYYYYYYYYYYYYYYYYYYYYYYYYYYYY - Jack Roberto 2k22
+# will need to run command
+# "pip install -q tensorflow-model-optimization"
+# in order to get optimization API and make this work
+
+cluster_weights=tfmot.clustering.keras.cluster_weights
+centroidInitialization = tfmot.clustering.keras.centroidInitialization
+
+clustering_params={
+    'number_of_clusters': 10,  #too many clusters increases accuracy - slows down system (think nodes)
+    'cluster_centroids_init': centroidInitialization.LINEAR
+    }
+clustered_model = cluster_weights(model, **clustering_params) #TODO i THINK "model" needs to be replaced with model name
+opt = tf.keras.optimizer.Adam(learning_rate=1e-5)
+clustered_model.compile(
+    loss=tf.keras.losses.sparseCategoricalCrossentropy(from_logits=True),
+    optimizer = opt,
+    metrics = ['accuracy'])
+clustered_model.summary
+
+final_model = tfmot.clustering.keras.strip_clustering(clustered_model)
+
+##advice still dictates that transfering "final model" to tensorflow lite allows the model to run better on restricted hardware
+##example (i think) below
+clustered_keras_file=tempfile.mkstemp('.h5')
+print('saving clustered model to:', clustered_keras_file)
+tf.keras.models.save_model(final_model, clustered_keras_file, include_optimizer = False)
+#create compressible model for TFLite.
+clustered_tflite_file='/tmp/clustered_model.tflite'
+converter=tf.lite.TFLiteConverter.from_keras_model(final_model)
+tflite_clustered_model=converter.convert()
+with open(clustered_tflite_file, 'wb') as f:
+    f.write(tflite_clustered_model)
+    print('saved clustered tflite model to:', clustered_tflite_file)
 
 
