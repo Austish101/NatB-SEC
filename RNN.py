@@ -127,8 +127,6 @@ class Split:
                     # ensure error is only sent once
                     if error_predict[n] > error_threshold and time_to_error < time_threshold:
                         print("Prediction at i =", i)
-                        n = n + 10
-                        wait_timestamp = current_timestamp + time_threshold
                         predicted_error = n
                         predictions.append([predicted_error, error_predict, time_predict])
 
@@ -148,6 +146,8 @@ class Split:
                         if current_timestamp > expected_timestamp:
                             num_errors_missed = num_errors_missed + 1
                         stats.append([is_error_correct, is_time_correct, time_difference, num_errors_missed])
+                        # break out of for loop, only predicting max one error per window
+                        break
                     # else - if thresholds not met
                     # else:
                     #   predictions.append(np.array([-1, error_predict, time_predict]))

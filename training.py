@@ -28,9 +28,16 @@ def outputs_given_inputs(input_data, output_data, split):
     train_inputs = []
     test_inputs = []
     n = 0
+    liveliness_count = 0
+    deadline_count = 0
+    sample_count = 0
     for i in range(len(input_data)):
+        if n == output_data.shape[0]:
+            n = 0
+            continue
         if (float(output_data[n][0]) < input_data[i][0]) or (n == 0):
             error_found = False
+            error_type = None
             # find the next occuring error
             while not error_found:
                 n = n + 1
@@ -63,21 +70,39 @@ def outputs_given_inputs(input_data, output_data, split):
                     #     print("At time: " + output_data[n][0] + " : ", end='')
                     #     print(strtemp, end='')
                     if errstr_liveliness_changed in strtemp:
-                        error_type = np.array([float(output_data[n][0]), float(1), float(0), float(0)])
+                        # to even the number of errors in training
+                        if data_set == "train":
+                            if (liveliness_count <= deadline_count) or (liveliness_count <= sample_count):
+                                error_type = np.array([float(output_data[n][0]), float(1), float(0), float(0)])
+                                liveliness_count += 1
+                        else:
+                            error_type = np.array([float(output_data[n][0]), float(1), float(0), float(0)])
                     elif errstr_requested_deadline_missed in strtemp:
-                        error_type = np.array([float(output_data[n][0]), float(0), float(1), float(0)])
+                        # to even the number of errors in training
+                        if data_set == "train":
+                            if (deadline_count <= liveliness_count) or (deadline_count <= sample_count):
+                                error_type = np.array([float(output_data[n][0]), float(0), float(1), float(0)])
+                                deadline_count += 1
+                        else:
+                            error_type = np.array([float(output_data[n][0]), float(0), float(1), float(0)])
                     elif errstr_sample_lost in strtemp:
-                        error_type = np.array([float(output_data[n][0]), float(0), float(0), float(1)])
-
-        if data_set == "train":
-            train_outputs.append(error_type)
-            train_inputs.append(input_data[i])
-        elif data_set == "test":
-            test_outputs.append(error_type)
-            test_inputs.append(input_data[i])
-        # cut off the tail of input data where there is no error
-        if n == output_data.shape[0]:
-            break
+                        # to even the number of errors in training
+                        if data_set == "train":
+                            if (sample_count <= liveliness_count) or (sample_count <= deadline_count):
+                                error_type = np.array([float(output_data[n][0]), float(0), float(0), float(1)])
+                                sample_count += 1
+                        else:
+                            error_type = np.array([float(output_data[n][0]), float(0), float(0), float(1)])
+        if error_type is not None:
+            if data_set == "train":
+                train_outputs.append(error_type)
+                train_inputs.append(input_data[i])
+            elif data_set == "test":
+                test_outputs.append(error_type)
+                test_inputs.append(input_data[i])
+            # cut off the tail of input data where there is no error
+            if n == output_data.shape[0]:
+                break
 
     return np.array(train_inputs), np.array(train_outputs), np.array(test_inputs), np.array(test_outputs)
 
@@ -127,7 +152,7 @@ try:
     testing_in_all = np.loadtxt('testing_in.txt', dtype=float)
     testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
     print("Training data loaded from saved files")
-except: #FileNotFoundError: (doesn't work on all OS, now just any exception...)
+except:  # FileNotFoundError: (doesn't work on all OS, now just any exception...)
     print("Loading training data from pcap files and saving for faster reading next time, this may take some time")
     training_in_list = []
     training_out_list = []
@@ -135,7 +160,7 @@ except: #FileNotFoundError: (doesn't work on all OS, now just any exception...)
     testing_out_list = []
     for file in config["training_files"]:
         file_input_data, file_output_data = input_data.get_inputs_and_outputs(config["training_filepath"], file, config["rtps_selection"])
-        training_in, training_out, testing_in, testing_out = outputs_given_inputs(file_input_data, file_output_data, int(config["split"]))
+        training_in, training_out, testing_in, testing_out = outputs_given_inputs(file_input_data, file_output_data, int(config['split']))
         training_in_list.extend(training_in)
         training_out_list.extend(training_out)
         testing_in_list.extend(testing_in)
@@ -175,7 +200,7 @@ for i in range(0, int(config["training_repeats"])):
     tot_time_dif = 0
 
     predictions, stats = net.predict_test(input_shaped, output_shaped, "stats", error_threshold, time_threshold)
-#     error_correct, time_correct, time_difference, num_errors_missed = np.split(stats, [1, 2, 3], axis=1)
+    error_correct, time_correct, time_difference, num_errors_missed = np.split(stats, [1, 2, 3], axis=1)
 #     num_predictions = error_correct.shape[0]
 #     for n in range(0, num_predictions):
 #         if error_correct[n] and time_correct[n]:

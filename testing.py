@@ -6,11 +6,12 @@ import RNN
 import tensorflow as tf
 import numpy as np
 import sys
-import LSTM
 
 config = input_data.read_json("config.json")
 
-#copied from training.py
+
+# TODO call to using training.standard_data()
+# copied from training.py
 def standard_data(data, sd, mean, kind="all"):
     std_data = data
 
@@ -31,13 +32,16 @@ def standard_data(data, sd, mean, kind="all"):
 
     return std_data
 
-#copied from training.py
+
+# TODO call to using training.get_sd_mean()
+# copied from training.py
 def get_sd_mean(data):
     sd = np.std(data, axis=0, dtype=float)
     mean = np.mean(data, axis=0, dtype=float)
     return sd, mean
 
-#need to load an input and output array to configure the network.
+
+# need to load an input and output array to configure the network.
 try:
     training_in_all = np.loadtxt('training_in.txt', dtype=float)
     training_out_all = np.loadtxt('training_out.txt', dtype=float)
@@ -55,10 +59,10 @@ testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
 testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
 #scores = []
-net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+net = RNN.Split(config, training_in_std, training_out_std)
 net.load_models("", "") #the params aren't currently used...
 
-time_score, error_score, combined_score = net.predict(testing_in_std, testing_out_std)
+time_score, error_score, combined_score = net.predict_real(testing_in_std, testing_out_std)
 print("Time Score:", time_score, "\nError Score:", error_score, "\nCombined:", combined_score)
 #scores.append([time_score, error_score])
 #print("Time Score:", time_score, "\nError Score:", error_score)

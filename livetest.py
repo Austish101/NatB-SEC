@@ -5,11 +5,11 @@
 # - Add check for current time in the time thread
 
 import RNN
+import training
 import tensorflow as tf
 import numpy as np
 import pyshark
 import input_data #only need this one to get a small file to setup the array sizes - might be able to get rid of later
-import LSTM
 import json
 
 import output_data
@@ -42,7 +42,7 @@ syncpipe_recv, syncpipe_send = Pipe()
 testvar = False
 
 
-
+# TODO call to using training.standard_data()
 #copied from training.py
 def standard_data(data, sd, mean, kind="all"):
     std_data = data
@@ -64,6 +64,7 @@ def standard_data(data, sd, mean, kind="all"):
 
     return std_data
 
+# TODO call to using training.get_sd_mean()
 #copied from training.py
 def get_sd_mean(data):
     sd = np.std(data, axis=0, dtype=float)
@@ -184,7 +185,8 @@ if __name__ == '__main__':
         testing_out_all = np.loadtxt('testing_out.txt', dtype=float)
     except:
         print("A training file is required to initialise the neural network.")
-        sys.exit()
+        # sys.exit()
+        quit()
 
     input_sd, input_mean = get_sd_mean(training_in_all)
     output_sd, output_mean = get_sd_mean(training_out_all)
@@ -194,7 +196,7 @@ if __name__ == '__main__':
     testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
     # scores = []
-    net = LSTM.SplitLSTM(config, training_in_std, training_out_std)
+    net = RNN.Split(config, training_in_std, training_out_std, input_mean, input_sd, output_mean, output_sd)
     net.load_models("", "")  # the params aren't currently used...
     # net = RNN.RNN(config, inputs_temp, outputs_temp)
 
