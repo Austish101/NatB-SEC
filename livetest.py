@@ -41,36 +41,6 @@ syncpipe_recv, syncpipe_send = Pipe()
 
 testvar = False
 
-
-# TODO call to using training.standard_data()
-#copied from training.py
-def standard_data(data, sd, mean, kind="all"):
-    std_data = data
-
-    if data.shape.__len__() == 1:
-        for d in range(0, data.shape[0]):
-            calc = (data[d] - mean[d]) / sd[d]
-            std_data[d] = float(calc)
-        return std_data
-
-    for p in range(0, data.shape[0]):
-        if kind == "non-error":
-            calc = (data[p][0] - mean[0]) / sd[0]
-            std_data[p][0] = float(calc)
-        else:
-            for d in range(0, data[0].shape[0]):
-                calc = (data[p][d] - mean[d]) / sd[d]
-                std_data[p][d] = float(calc)
-
-    return std_data
-
-# TODO call to using training.get_sd_mean()
-#copied from training.py
-def get_sd_mean(data):
-    sd = np.std(data, axis=0, dtype=float)
-    mean = np.mean(data, axis=0, dtype=float)
-    return sd, mean
-
 def shiftpktarray(pktarray_in, pkt):
     newpktarray = np.roll(pktarray_in, 1, axis=0)
     newpktarray[0] = pkt
@@ -188,12 +158,12 @@ if __name__ == '__main__':
         # sys.exit()
         quit()
 
-    input_sd, input_mean = get_sd_mean(training_in_all)
-    output_sd, output_mean = get_sd_mean(training_out_all)
-    training_in_std = standard_data(training_in_all, input_sd, input_mean)
-    training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
-    testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
-    testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
+    input_sd, input_mean = training.get_sd_mean(training_in_all)
+    output_sd, output_mean = training.get_sd_mean(training_out_all)
+    training_in_std = training.standard_data(training_in_all, input_sd, input_mean)
+    training_out_std = training.standard_data(training_out_all, output_sd, output_mean, "non-error")
+    testing_in_std = training.standard_data(testing_in_all, input_sd, input_mean)
+    testing_out_std = training.standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
     # scores = []
     net = RNN.Split(config, training_in_std, training_out_std, input_mean, input_sd, output_mean, output_sd)

@@ -21,5 +21,7 @@
   "team": 0,
   "networkname": "Wi-Fi 2",
   "timeout": 20,
-  "training_repeats": 1
+  "training_repeats": 1,
+  "port": 8081,
+  "api_url": ""
 }
