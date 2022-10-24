@@ -5,7 +5,7 @@
 # - Add check for current time in the time thread
 
 import RNN
-import training
+import support
 import tensorflow as tf
 import numpy as np
 import pyshark
@@ -20,7 +20,11 @@ from multiprocessing import Pool
 import multiprocessing
 import time
 
+#if you have a working directory problem this makes finding it way easier...
+print('Reading Config Json: ', end='')
 config = input_data.read_json("config.json")
+print('Done.')
+
 #create a file that has basically nothing but two or three samples, so it loads quickly to initialise the arrays.
 #alternatively, generate a blank array of the right lengths.
 #inputs_temp, outputs_temp = input_data.get_inputs_and_outputs(config["training_files"])
@@ -158,12 +162,12 @@ if __name__ == '__main__':
         # sys.exit()
         quit()
 
-    input_sd, input_mean = training.get_sd_mean(training_in_all)
-    output_sd, output_mean = training.get_sd_mean(training_out_all)
-    training_in_std = training.standard_data(training_in_all, input_sd, input_mean)
-    training_out_std = training.standard_data(training_out_all, output_sd, output_mean, "non-error")
-    testing_in_std = training.standard_data(testing_in_all, input_sd, input_mean)
-    testing_out_std = training.standard_data(testing_out_all, output_sd, output_mean, "non-error")
+    input_sd, input_mean = support.get_sd_mean(training_in_all)
+    output_sd, output_mean = support.get_sd_mean(training_out_all)
+    training_in_std = support.standard_data(training_in_all, input_sd, input_mean)
+    training_out_std = support.standard_data(training_out_all, output_sd, output_mean, "non-error")
+    testing_in_std = support.standard_data(testing_in_all, input_sd, input_mean)
+    testing_out_std = support.standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
     # scores = []
     net = RNN.Split(config, training_in_std, training_out_std, input_mean, input_sd, output_mean, output_sd)

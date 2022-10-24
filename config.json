@@ -19,9 +19,9 @@
   "error_threshold": 0.9,
   "time_threshold": 1000,
   "team": 0,
-  "networkname": "Wi-Fi 2",
+  "networkname": "eth0",
   "timeout": 20,
   "training_repeats": 1,
   "port": 8081,
-  "api_url": ""
+  "api_url": "192.168.200.171"
 }

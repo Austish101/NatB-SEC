@@ -8,6 +8,7 @@ import numpy as np
 #required for clustering (if it works)
 import tensorflow_model_optimization as tfmot
 import tempfile
+import support
 import zipfile
 import os
 
@@ -116,31 +117,6 @@ def split_data(split_percentage, data):
     return split1, split2
 
 
-def get_sd_mean(data):
-    sd = np.std(data, axis=0, dtype=float)
-    mean = np.mean(data, axis=0, dtype=float)
-    return sd, mean
-
-
-def standard_data(data, sd, mean, kind="all"):
-    std_data = data
-
-    if data.shape.__len__() == 1:
-        for d in range(0, data.shape[0]):
-            calc = (data[d] - mean[d]) / sd[d]
-            std_data[d] = float(calc)
-        return std_data
-
-    for p in range(0, data.shape[0]):
-        if kind == "non-error":
-            calc = (data[p][0] - mean[0]) / sd[0]
-            std_data[p][0] = float(calc)
-        else:
-            for d in range(0, data[0].shape[0]):
-                calc = (data[p][d] - mean[d]) / sd[d]
-                std_data[p][d] = float(calc)
-
-    return std_data
 
 
 # TODO read more or all training files at once, to get all errors and possible outcomes
@@ -176,12 +152,12 @@ except:  # FileNotFoundError: (doesn't work on all OS, now just any exception...
     np.savetxt('testing_out.txt', testing_out_all, fmt='%f')
 
 
-input_sd, input_mean = get_sd_mean(training_in_all)
-output_sd, output_mean = get_sd_mean(training_out_all)
-training_in_std = standard_data(training_in_all, input_sd, input_mean)
-training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
-testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
-testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
+input_sd, input_mean = support.get_sd_mean(training_in_all)
+output_sd, output_mean = support.get_sd_mean(training_out_all)
+training_in_std = support.standard_data(training_in_all, input_sd, input_mean)
+training_out_std = support.standard_data(training_out_all, output_sd, output_mean, "non-error")
+testing_in_std = support.standard_data(testing_in_all, input_sd, input_mean)
+testing_out_std = support.standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
 # using non-std output data?
 scores = []
