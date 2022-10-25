@@ -233,7 +233,7 @@ for i in range(0, int(config["episodes"])):
     per_time = (num_time / num_predictions) * 100
     per_error = (num_error / num_predictions) * 100
 
-    run_data = np.array([per_correct, per_time, per_error, avg_time_dif, float(num_errors_missed.max)])
+    run_data = np.array([per_correct, per_time, per_error, avg_time_dif, np.max(num_errors_missed)])
     np.savetxt('stats_over_%s_by_%s_trains.txt' % (i, int(config["epochs"])), run_data)
 
 # save the weights and the sd/means
