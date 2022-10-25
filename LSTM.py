@@ -218,3 +218,8 @@ class SplitLSTM:
     def load_models(self, error_file, time_file):
         self.error_model = keras.models.load_model(error_file)
         self.time_model = keras.models.load_model(time_file)
+
+    def get_sd_mean(self):
+        input_sd_mean = np.loadtxt('input_sd_mean.txt')
+        output_sd_mean = np.loadtxt('input_sd_mean.txt')
+        return input_sd_mean, output_sd_mean

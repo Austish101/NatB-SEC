@@ -1,9 +1,13 @@
+import copy
+
 import keras.models
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 import numpy as np
 import time
+
+import output_data
 
 
 class Split:
@@ -84,17 +88,15 @@ class Split:
     def predict_real(self, inputs, error_threshold=0.9, time_threshold=1000):
         error_predict = self.error_model.predict(inputs)
         time_predict = self.time_model.predict(inputs)
-        wait_timestamp = 0
 
-        current_timestamp = time.time_ns()
+        current_timestamp = time.time()
         predicted_timestamp = self.unstd_time(time_predict)
         time_to_error = abs(current_timestamp - predicted_timestamp)
 
         # if error is above thresholds error type is returned, else -1 is returned, predictions returned for logging
         for n in range(0, error_predict.shape[0]):
             if error_predict[n] > error_threshold and time_to_error < time_threshold:
-                n = n + 10
-                # TODO API post
+                output_data.post_error(n, time_predict)
                 return n, error_predict, time_predict
         return -1, error_predict, time_predict
 
@@ -127,8 +129,6 @@ class Split:
                     # ensure error is only sent once
                     if error_predict[n] > error_threshold and time_to_error < time_threshold:
                         print("Prediction at i =", i)
-                        n = n + 10
-                        wait_timestamp = current_timestamp + time_threshold
                         predicted_error = n
                         predictions.append([predicted_error, error_predict, time_predict])
 
@@ -141,80 +141,89 @@ class Split:
                             is_time_correct = False
                         is_error_correct = False
                         for e in range(0, error_predict.shape[0]):
-                            if test_error[i][e] == 1:
+                            if test_error[i][e] == 1.0:
                                 if predicted_error == e:
                                     is_error_correct = True
+                                break
                         # if time is after error, error missed
                         if current_timestamp > expected_timestamp:
                             num_errors_missed = num_errors_missed + 1
-                        stats.append([is_error_correct, is_time_correct, time_difference, num_errors_missed])
+                        prediction_stats = [is_error_correct, is_time_correct, time_difference, num_errors_missed]
+                        stats.append(copy.deepcopy(prediction_stats))
+                        # break out of for loop, only predicting max one error per window
+                        break
                     # else - if thresholds not met
                     # else:
                     #   predictions.append(np.array([-1, error_predict, time_predict]))
 
             return np.array(predictions), np.array(stats)
 
-        else:
-            error_predict = self.error_model.predict(test_input)
-            time_predict = self.time_model.predict(test_input)
+        # scoring won't work with current build
+        # else:
+        #     error_predict = self.error_model.predict(test_input)
+        #     time_predict = self.time_model.predict(test_input)
+        #
+        #     error_score = self.evaluate_error(error_predict, test_error)
+        #     time_score = self.evaluate_time(time_predict, test_time)
+        #     combined_score = error_score * time_score
+        #
+        #     return time_score, error_score, combined_score
 
-            error_score = self.evaluate_error(error_predict, test_error)
-            time_score = self.evaluate_time(time_predict, test_time)
-            combined_score = error_score * time_score
-
-            return time_score, error_score, combined_score
-
-    def evaluate_time(self, prediction, expected):
-        scores = []
-        total = 0
-        for i in range(0, prediction.shape[0]):
-            score = abs(prediction - expected)
-            if expected[i] > prediction[i]:
-                score = prediction[i] / expected[i]
-            elif expected[i] < prediction[i]:
-                score = expected[i] / prediction[i]
-            elif expected[i] == prediction[i]:
-                score = [1]
-
-        time_difference = abs(prediction - expected)
-        if expected > prediction:
-            score = prediction / expected
-        elif expected < prediction:
-            score = expected / prediction
-        elif expected == prediction:
-            score = [1]
-
-            scores.append(score[0])
-            total = total + score[0]
-        average = float(total / prediction.shape[0])
-
-        return average
-
-    def evaluate_error(self, prediction, expected):
-        scores = []
-        total = 0
-        for i in range(0, prediction.shape[0]):
-            score = 0
-            for e in range(0, prediction.shape[1]):
-                if expected[i][e] == 1:
-                    score = prediction[i][e]
-                    break
-            scores.append(score)
-            total = total + score
-        average = float(total / prediction.shape[0])
-
-        return average
+    # def evaluate_time(self, prediction, expected):
+    #     scores = []
+    #     total = 0
+    #     for i in range(0, prediction.shape[0]):
+    #         score = abs(prediction - expected)
+    #         if expected[i] > prediction[i]:
+    #             score = prediction[i] / expected[i]
+    #         elif expected[i] < prediction[i]:
+    #             score = expected[i] / prediction[i]
+    #         elif expected[i] == prediction[i]:
+    #             score = [1]
+    #
+    #     time_difference = abs(prediction - expected)
+    #     if expected > prediction:
+    #         score = prediction / expected
+    #     elif expected < prediction:
+    #         score = expected / prediction
+    #     elif expected == prediction:
+    #         score = [1]
+    #
+    #         scores.append(score[0])
+    #         total = total + score[0]
+    #     average = float(total / prediction.shape[0])
+    #
+    #     return average
+    #
+    # def evaluate_error(self, prediction, expected):
+    #     scores = []
+    #     total = 0
+    #     for i in range(0, prediction.shape[0]):
+    #         score = 0
+    #         for e in range(0, prediction.shape[1]):
+    #             if expected[i][e] == 1:
+    #                 score = prediction[i][e]
+    #                 break
+    #         scores.append(score)
+    #         total = total + score
+    #     average = float(total / prediction.shape[0])
+    #
+    #     return average
 
     # saves the model + sd and mean of the dataset, sd/mean should not be needed if model contains this data
     def save_model_sd_mean(self, tag, input_sd, input_mean, output_sd, output_mean):
         input_sd_mean = np.array([input_sd, input_mean])
         output_sd_mean = np.array([output_sd, output_mean])
         self.error_model.save("error_model%s" % tag)
-        self.time_model.save("time_model%s"
-                             "" % tag)
+        self.time_model.save("time_model%s""" % tag)
         np.savetxt('input_sd_mean%s.txt' % tag, input_sd_mean, fmt='%f')
         np.savetxt('output_sd_mean%s.txt' % tag, output_sd_mean, fmt='%f')
 
     def load_models(self, error_file, time_file):
         self.error_model = keras.models.load_model(error_file)
         self.time_model = keras.models.load_model(time_file)
+
+    def get_sd_mean(self, tag=""):
+        input_sd_mean = np.loadtxt('input_sd_mean%s.txt' % tag)
+        output_sd_mean = np.loadtxt('output_sd_mean%s.txt' % tag)
+        return input_sd_mean, output_sd_mean
