@@ -10,6 +10,7 @@ import tensorflow_model_optimization as tfmot
 import tempfile
 import zipfile
 import os
+import time
 
 #This is required if CUDA drivers are installed, LSTM performs badly on CUDA over CPU
 import os
@@ -22,7 +23,6 @@ def outputs_given_inputs(input_data, output_data, split):
     errstr_sample_lost = "DRIVER on_sample_lost"
     dumpallerrors = True
 
-
     train_outputs = []
     test_outputs = []
     train_inputs = []
@@ -31,10 +31,23 @@ def outputs_given_inputs(input_data, output_data, split):
     liveliness_count = 0
     deadline_count = 0
     sample_count = 0
+
+    # normalise timestamps a bit
+    real_ts = time.time()
+    start_ts = float(input_data[0][0])
+    ts_diff = real_ts - start_ts
+
     for i in range(len(input_data)):
+        # timestamp setup, if difference in recorded and real time is over 1mil seconds, reset
+        in_data_ts = float(input_data[i][0]) + ts_diff
+        if in_data_ts > (real_ts + 1000000) or in_data_ts < (real_ts - 1000000):
+            ts_diff = real_ts - float(input_data[i][0])
+            in_data_ts = float(input_data[i][0]) + ts_diff
+
         if n == output_data.shape[0]:
             n = 0
             continue
+        out_data_ts = float(output_data[n][0]) + ts_diff
         if (float(output_data[n][0]) < input_data[i][0]) or (n == 0):
             error_found = False
             error_type = None
@@ -73,33 +86,35 @@ def outputs_given_inputs(input_data, output_data, split):
                         # to even the number of errors in training
                         if data_set == "train":
                             if (liveliness_count <= deadline_count) or (liveliness_count <= sample_count):
-                                error_type = np.array([float(output_data[n][0]), float(1), float(0), float(0)])
+                                error_type = np.array([out_data_ts, float(1), float(0), float(0)])
                                 liveliness_count += 1
                         else:
-                            error_type = np.array([float(output_data[n][0]), float(1), float(0), float(0)])
+                            error_type = np.array([out_data_ts, float(1), float(0), float(0)])
                     elif errstr_requested_deadline_missed in strtemp:
                         # to even the number of errors in training
                         if data_set == "train":
                             if (deadline_count <= liveliness_count) or (deadline_count <= sample_count):
-                                error_type = np.array([float(output_data[n][0]), float(0), float(1), float(0)])
+                                error_type = np.array([out_data_ts, float(0), float(1), float(0)])
                                 deadline_count += 1
                         else:
-                            error_type = np.array([float(output_data[n][0]), float(0), float(1), float(0)])
+                            error_type = np.array([out_data_ts, float(0), float(1), float(0)])
                     elif errstr_sample_lost in strtemp:
                         # to even the number of errors in training
                         if data_set == "train":
                             if (sample_count <= liveliness_count) or (sample_count <= deadline_count):
-                                error_type = np.array([float(output_data[n][0]), float(0), float(0), float(1)])
+                                error_type = np.array([out_data_ts, float(0), float(0), float(1)])
                                 sample_count += 1
                         else:
-                            error_type = np.array([float(output_data[n][0]), float(0), float(0), float(1)])
+                            error_type = np.array([out_data_ts, float(0), float(0), float(1)])
         if error_type is not None:
+            in_data = input_data[i]
+            in_data[0] = in_data_ts
             if data_set == "train":
                 train_outputs.append(error_type)
-                train_inputs.append(input_data[i])
+                train_inputs.append(in_data)
             elif data_set == "test":
                 test_outputs.append(error_type)
-                test_inputs.append(input_data[i])
+                test_inputs.append(in_data)
             # cut off the tail of input data where there is no error
             if n == output_data.shape[0]:
                 break
@@ -186,8 +201,8 @@ testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-er
 # using non-std output data?
 scores = []
 net = RNN.Split(config, training_in_std, training_out_std, input_sd, input_mean, output_sd, output_mean)
-for i in range(0, int(config["training_repeats"])):
-    net.fit_models(epochs=100)
+for i in range(0, int(config["episodes"])):
+    net.fit_models(epochs=int(config["epochs"]))
     input_shaped, output_shaped = net.shape_data(training_in_std, training_out_std, int(config['window_size']))
     error_threshold = float(config['error_threshold'])
     time_threshold = float(config['time_threshold'])
@@ -195,33 +210,35 @@ for i in range(0, int(config["training_repeats"])):
     # scores.append([time_score, error_score])
     # print("Time Score:", time_score, "\nError Score:", error_score, "\nCombined:", combined_score)
     num_correct = 0
-    num_time_only = 0
-    num_error_only = 0
+    num_time = 0
+    num_error = 0
     tot_time_dif = 0
 
     predictions, stats = net.predict_test(input_shaped, output_shaped, "stats", error_threshold, time_threshold)
     error_correct, time_correct, time_difference, num_errors_missed = np.split(stats, [1, 2, 3], axis=1)
-#     num_predictions = error_correct.shape[0]
-#     for n in range(0, num_predictions):
-#         if error_correct[n] and time_correct[n]:
-#             num_correct = num_correct + 1
-#         elif error_correct[n]:
-#             num_error_only = num_error_only + 1
-#         elif time_correct[n]:
-#             num_time_only = num_time_only + 1
-#         tot_time_dif = tot_time_dif + time_difference[n]
-#
-#     avg_time_dif = tot_time_dif / num_predictions
-#     per_correct = (num_correct / num_predictions) * 100
-#     per_time_only = (num_time_only / num_predictions) * 100
-#     per_error_only = (num_error_only / num_predictions) * 100
-#
-#     run_data = [[per_correct, per_time_only, per_error_only, avg_time_dif, num_errors_missed], config]
-#
-# np.savetxt('stats_over_100_by_1_trains.txt', np.array(run_data))
+    num_predictions = error_correct.shape[0]
+    for n in range(0, num_predictions):
+        if error_correct[n] and time_correct[n]:
+            num_correct += 1
+            num_error += 1
+            num_time += 1
+        elif error_correct[n]:
+            num_error += 1
+        elif time_correct[n]:
+            num_time += 1
+        tot_time_dif = tot_time_dif + time_difference[n]
+
+    avg_time_dif = tot_time_dif / num_predictions
+    per_correct = (num_correct / num_predictions) * 100
+    per_time = (num_time / num_predictions) * 100
+    per_error = (num_error / num_predictions) * 100
+
+    run_data = np.array([per_correct, per_time, per_error, avg_time_dif, num_errors_missed])
+
+# np.savetxt('stats_over_%s_by_%s_trains.txt' % (int(config["episodes"]), int(config["epochs"])), run_data)
 
 # save the weights and the sd/means
-net.save_model_sd_mean("100x%s" % int(config["training_repeats"]), input_sd, input_mean, output_sd, output_mean)
+net.save_model_sd_mean("%sx%s" % (int(config["episodes"]), int(config["epochs"])), input_sd, input_mean, output_sd, output_mean)
 
 # im going to try SOME CLUSTERING BABYYYYYYYYYYYYYYYYYYYYYYYYYYYYY - Jack Roberto 2k22
 # will need to run command
