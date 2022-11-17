@@ -1,12 +1,12 @@
 {
-  "training_files": ["SECH.ETH1_33", "SECH.ETH1_ETH2_Error_Band_Delay", "SECH.ETH1_ETH2_Errors_Bandwith", "SECH.ETH1_ETH2_InversErrors_Bandwith", "SECH.ETH2_33", "SECH.ETH12_50", "SECH.ETH12_75", "SECH.ETH12_InverseSteps", "SECH.ETH12_Steps", "SECH.IncrementalDelay_Eth1Eth2", "SECH.IncrementalDelayAndLoss_Eth1", "SECH.IncrementalDelayAndLoss_Eth1Eth2", "SECH.IncrementalDelayAndLoss_Eth2", "SECH.IncrementalDelayEth1", "SECH.IncrementalDelayEth2", "SECH.IncrementalLoss_Eth1", "SECH.IncrementalLoss_Eth1Eth2", "SECH.IncrementalLoss_Eth2", "SECH.RandomScenario", "SECH.RandomScenario30"],
+  "training_files": ["SECH.IncrementalDelayEth1"],
   "training_filepath": "Dataset/newDataset/",
   "split": "70",
   "rtps_selection": ["flag_endianness", "flag_final", "flag_liveliness", "flag_reserved", "heartbeat_count", "sm_acknack_analysis"],
   "learning_rate":  0.1,
   "discount_rate": 0.5,
   "epsilon": 1,
-  "episodes": 100,
+  "episodes": 1,
   "epochs": 100,
   "loss": "mean_squared_error",
   "activation": "tanh",
@@ -20,7 +20,9 @@
   "error_threshold": 0.9,
   "time_threshold": 1000,
   "team": 0,
-  "networkname": "Wi-Fi 2",
+  "networkname": "eth0",
   "timeout": 20,
-  "training_repeats": 1
+  "training_repeats": 1,
+  "port": 8081,
+  "api_url": "http://192.168.200.171"
 }

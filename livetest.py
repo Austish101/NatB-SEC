@@ -5,7 +5,7 @@
 # - Add check for current time in the time thread
 
 import RNN
-import training
+import support
 import tensorflow as tf
 import numpy as np
 import pyshark
@@ -19,68 +19,22 @@ from multiprocessing import Process, Pipe
 from multiprocessing import Pool
 import multiprocessing
 import time
+import pyshark
 
-config = input_data.read_json("config.json")
-#create a file that has basically nothing but two or three samples, so it loads quickly to initialise the arrays.
-#alternatively, generate a blank array of the right lengths.
-#inputs_temp, outputs_temp = input_data.get_inputs_and_outputs(config["training_files"])
-team = config["team"]
-port = config["port"]
-api_url = config["api_url"]
-ifname = config["networkname"] #Wi-Fi 2 just what I'm testing with....
-time_out = config["timeout"] #set this far higher, or basically infinitely high to run forever...
-
-pktarray = np.zeros((3, 9), dtype='float') #edit this to be dynamic, get 3+length of params list from config
-pipe_recv, pipe_send = Pipe()
-syncpipe_recv, syncpipe_send = Pipe()
-
-#a time offset for syncronising and a check for if it has been initialised yet or not.
-#use the first packet to do this...
-#syncoffset = 0
-#syncinit = False
-
-testvar = False
-
-
-# TODO call to using training.standard_data()
-#copied from training.py
-def standard_data(data, sd, mean, kind="all"):
-    std_data = data
-
-    if data.shape.__len__() == 1:
-        for d in range(0, data.shape[0]):
-            calc = (data[d] - mean[d]) / sd[d]
-            std_data[d] = float(calc)
-        return std_data
-
-    for p in range(0, data.shape[0]):
-        if kind == "non-error":
-            calc = (data[p][0] - mean[0]) / sd[0]
-            std_data[p][0] = float(calc)
-        else:
-            for d in range(0, data[0].shape[0]):
-                calc = (data[p][d] - mean[d]) / sd[d]
-                std_data[p][d] = float(calc)
-
-    return std_data
-
-# TODO call to using training.get_sd_mean()
-#copied from training.py
-def get_sd_mean(data):
-    sd = np.std(data, axis=0, dtype=float)
-    mean = np.mean(data, axis=0, dtype=float)
-    return sd, mean
 
 def shiftpktarray(pktarray_in, pkt):
-    newpktarray = np.roll(pktarray_in, 1, axis=0)
-    newpktarray[0] = pkt
+    #newpktarray = np.roll(pktarray_in, 1, axis=0)
+    #newpktarray[0] = pkt[0]
+    newpktarray = np.roll(pktarray_in, 9, axis=1)
+    newpktarray[0][0:9] = pkt[0]
     return newpktarray
 
 #=================================================================================================================
 # The time management thread and the packet detection thread
 #=================================================================================================================
 
-def threads(net, threadno, pipe, syncpipe):
+
+def threads(net, threadno, pipe, syncpipe, tag):
     if threadno == 0:
         print("Thread 0 Start")
         runthread = True
@@ -107,19 +61,20 @@ def threads(net, threadno, pipe, syncpipe):
                 if (pipearray[0] + syncoffset < time.time()): #is the predicted time less than actual time? then error has happened.
                     if sent_already_if_true == False: #ensures only one message per error prediction
                         sent_already_if_true = True
+                        print('Error Detected @:' + str(pipearray[0]))
                         if pipearray[1] > pipearray[2] and pipearray[1] > pipearray[3]:
                             #insert any change for alive_count or not_alive count here if desired
                             #seems to generally be once and 1 or 0, suggest don't bother.
-                            output_data.REST_on_liveliness_changed(
+                            output_data.post_on_liveliness_changed(
                                 port, api_url, team, alive_count, not_alive_count)
                         elif pipearray[2] > pipearray[1] and pipearray[2] > pipearray[3]:
                             missed_total_count = missed_total_count + 1
-                            output_data.REST_on_requested_deadline_missed(
+                            output_data.post_on_requested_deadline_missed(
                                 port, api_url, team, missed_total_count)
                         else:
                             #insert any change for lost_reason here if desired
                             #all examples in provided data is DDS_LOST_BY_WRITER which I've set as default, suggest don't bother.
-                            output_data.REST_on_sample_lost(
+                            output_data.post_on_sample_lost(
                                 port, api_url, team, lost_reason)
                 else:
                     sent_already_if_true = False
@@ -136,47 +91,69 @@ def threads(net, threadno, pipe, syncpipe):
         print("Thread 1 Start")
         syncoffset = float(0)
         syncinit = False
-        _, output_sd_mean = net.get_sd_mean()
-        time_sd = output_sd_mean[0][0]
-        time_mean = output_sd_mean[1][0]
-        error_sd = output_sd_mean[0][1:]
-        error_mean = output_sd_mean[1][1:]
+        #_, output_sd_mean = net.get_sd_mean(tag)
+        #time_sd = output_sd_mean[0][0]
+        #time_mean = output_sd_mean[1][0]
+        #error_sd = output_sd_mean[0][1:]
+        #error_mean = output_sd_mean[1][1:]
         #def checknetwork_thread():
+        filepath = 'Dataset/newDataset/'
+        filename = 'SECH.IncrementalDelayEth1'
+        rtpsPath = filepath + filename + '.RTPS.pcap'
+        print(rtpsPath)
+        rtps_capture = pyshark.FileCapture(rtpsPath)
+        syncoffsetT1 = 0
+        syncinitT1 = False
+        pktarray = np.zeros((1, 225), dtype='float')
+        pktarrayindex = 0
+        ifname = config["networkname"]
         capture = pyshark.LiveCapture(interface=ifname)
         for pkt in capture.sniff_continuously():
-            syncinit, syncoffset = pkt_callback(pkt, pipe, syncpipe, syncinit, syncoffset, time_sd, time_mean)
-        #try:
-        #    capture.apply_on_packets(pkt_callback, timeout=time_out)
-        #except:
-        #    print("Capture Time Completed or error, restart program if more required.")
-        pipe.send("end")
+            syncinitT1, syncoffsetT1, pktarray, pktarrayindex = pkt_callback(net, pkt, pipe, syncpipe, syncinitT1, syncoffsetT1, pktarray, pktarrayindex)
+
+
 
 #Note that pktarray may have problems - will need to pass this through all defs down to this level.
-def pkt_callback(net, pkt, pipe_send, syncpipe_send, syncinit, syncoffset, time_sd, time_mean):
+def pkt_callback(net, pkt, pipe_send, syncpipe_send, syncinit, syncoffset, pktarray, pktarrayindex): # , time_sd, time_mean):
     #global testvar
     #testvar = True
     #global pipe_send
     if syncinit == False:
         syncoffset = float(pkt.sniff_timestamp) - time.time()
-        syncpipe_send(syncoffset)
+        syncpipe_send.send(syncoffset)
     #pipe_send.send(pkt.sniff_timestamp)
+    #print("packet detected")
     if pkt.highest_layer == "RTPS":
         input_line = input_data.get_input_line(pkt, config["rtps_selection"])
-        global pktarray
-        #global firstpkt
-        #if firstpkt == True:
-        #    firstpkt = False
-        #    return
-        pktarray = shiftpktarray(pktarray, input_line)
-        #predict_d = net.model.predict(input_line, verbose=0) #if this fails put "input_line" into [ ] brackets.
-        predict_error = net.error_model.predict(pktarray)
-        predict_time = net.time_model.predict(pktarray)
-        predict_time = (predict_time * time_sd) + time_mean #reverse the standardisation
-        pipearray = np.concatenate((predict_time, predict_error))
-        pipe_send.send(pipearray)
-    return syncinit, syncoffset
+        #pipe_send.send(input_line)
+        pktarray[0][(pktarrayindex * 9) : ((pktarrayindex + 1) * 9)] = input_line[0]
+        pktarrayindex = pktarrayindex + 1
+        if pktarrayindex == 15:
+            pktarrayindex = 0
+            pipe_send.send(pktarray)
+    return syncinit, syncoffset, pktarray, pktarrayindex
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
+
+    # Main Variables
+    # if you have a working directory problem this makes finding it way easier...
+    print('Reading Config Json: ', end='')
+    config = input_data.read_json("config.json")
+    print('Done.')
+    tag = '1x100'
+    team = config["team"]
+    port = str(config["port"])
+    api_url = config["api_url"]
+    ifname = config["networkname"]  # Wi-Fi 2 just what I'm testing with....
+    time_out = config["timeout"]  # set this far higher, or basically infinitely high to run forever...
+    #pktarray = np.zeros((3, 9), dtype='float')  # edit this to be dynamic, get 3+length of params list from config
+    pktarray = np.zeros((1,225), dtype='float')
+    pipe_recv, pipe_send = Pipe()
+    syncpipe_recv, syncpipe_send = Pipe()
+    pktpipe_recv, pktpipe_send = Pipe()
+    testvar = False
+
     # need to load an input and output array to configure the network.
     try:
         training_in_all = np.loadtxt('training_in.txt', dtype=float)
@@ -188,22 +165,30 @@ if __name__ == '__main__':
         # sys.exit()
         quit()
 
-    input_sd, input_mean = get_sd_mean(training_in_all)
-    output_sd, output_mean = get_sd_mean(training_out_all)
-    training_in_std = standard_data(training_in_all, input_sd, input_mean)
-    training_out_std = standard_data(training_out_all, output_sd, output_mean, "non-error")
-    testing_in_std = standard_data(testing_in_all, input_sd, input_mean)
-    testing_out_std = standard_data(testing_out_all, output_sd, output_mean, "non-error")
+    input_sd, input_mean = support.get_sd_mean(training_in_all)
+    output_sd, output_mean = support.get_sd_mean(training_out_all)
+    training_in_std = support.standard_data(training_in_all, input_sd, input_mean)
+    training_out_std = support.standard_data(training_out_all, output_sd, output_mean, "non-error")
+    testing_in_std = support.standard_data(testing_in_all, input_sd, input_mean)
+    testing_out_std = support.standard_data(testing_out_all, output_sd, output_mean, "non-error")
 
     # scores = []
+    print('debugline1')
     net = RNN.Split(config, training_in_std, training_out_std, input_mean, input_sd, output_mean, output_sd)
-    net.load_models("", "")  # the params aren't currently used...
+    print('debugline2')
+    net.load_models("error_model" + tag, "time_model" + tag)  # the params aren't currently used...
     # net = RNN.RNN(config, inputs_temp, outputs_temp)
 
     print("Capture Started")
     print("number of CPU detected: ", multiprocessing.cpu_count())
-    with Pool(2) as p:
-        p.starmap(threads, [(0, 0, pipe_recv, syncpipe_recv), (net, 1, pipe_send, syncpipe_send)])
+    #with Pool(processes=2) as p:
+    #    p.starmap(threads, [(net, 1, pipe_send, syncpipe_send, tag), (0, 0, pipe_recv, syncpipe_recv, tag)])
+
+    p0 = multiprocessing.Process(target=threads, args=(0, 0, pipe_recv, syncpipe_recv, tag))
+    p1 = multiprocessing.Process(target=threads, args=(net, 1, pktpipe_send, syncpipe_send, tag))
+    p1.start()
+    p0.start()
+
         #= Process(target=threads, args=(i,))
         #jobs.append(p)
         #p.start()
@@ -221,6 +206,22 @@ if __name__ == '__main__':
     #    pass
     #y.close()
 
+    _, output_sd_mean = net.get_sd_mean(tag)
+    time_sd = output_sd_mean[0][0]
+    time_mean = output_sd_mean[1][0]
+
+    print("Thread 2 go")
+    while True:
+        while not pktpipe_recv.poll():
+            pass
+        pktarray = pktpipe_recv.recv()
+        #predict_d = net.model.predict(input_line, verbose=0) #if this fails put "input_line" into [ ] brackets.
+        predict_error = net.error_model.predict(pktarray)
+        predict_time = net.time_model.predict(pktarray)
+        predict_time = (predict_time * time_sd) + time_mean #reverse the standardisation
+        pipearray = np.concatenate((predict_time, predict_error), axis=1)
+        print("Predict_Success!!! Predict_Success!!! Predict_Success!!! Predict_Success!!! ")
+        pipe_send.send(pipearray[0])
 
 
 

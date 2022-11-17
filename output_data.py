@@ -7,6 +7,8 @@ import json
 # need to customise each of these, just not done it yet need caracal access.
 # useful info on requests : https://requests.readthedocs.io/en/latest/user/quickstart/#passing-parameters-in-urls
 
+# may need to create an adapter to be able to set ports - as defined this may not currently work
+# https://stackoverflow.com/questions/47202790/python-requests-how-to-specify-port-for-outgoing-traffic
 
 def post_error(error_type, predicted_timestamp):
     port = "8081"
